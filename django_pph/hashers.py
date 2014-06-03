@@ -9,6 +9,31 @@ from django.utils.translation import ugettext_noop as _
 
 from .shamirsecret import ShamirSecret
 
+# create_secret method:
+#   returns a random string consisting of 28 bytes of random data
+#   and 4 bytes of hash to verify the secret upon recombination
+def create_secret(digest):
+
+    secret = get_random_string(28)
+    secret_digest = b64encode(secret).decode('ascii').strip()[:4]
+    secret += secret_digest
+    return bytes(secret)
+
+# verify_secret function
+#   checks wether the secret given contains a proper fingerprint with the
+#   following form:
+#       [28 bytes random data][4 bytes hash of random data]
+# 
+#   the boolean returned indicates wether it falls under the fingerprint or
+#   not
+def _verify_secret(digest, secret):
+    
+    random_data = secret[:28]
+    secret_hash = digest(random_data).digest()
+    secret_hash_text = b64encode(secret_hash).decode('ascii').strip()[:4]
+    return constant_time_compare(secret[28:],secret_hash)
+
+
 
 def do_bytearray_xor(a, b):
     a = bytearray(a)
@@ -33,8 +58,8 @@ class PolyPassHasher(BasePasswordHasher):
     nextavailableshare = 0
     partialbytes = 2
     digest = hashlib.sha256
-    thresholdlesskey = bytes(get_random_string(32))
-    shamirsecretobj = ShamirSecret(5, thresholdlesskey)
+    thresholdlesskey = create_secret(digest)
+    shamirsecretobj = ShamirSecret(5 , thresholdlesskey)
 
     def encode(self, password, salt, sharenumber=None, iterations=None):
         assert password is not None
@@ -90,3 +115,4 @@ class PolyPassHasher(BasePasswordHasher):
     def must_update(self, encoded):
         algorithm, sharenumber, iterations, salt, hash = encoded.split('$', 4)
         return int(iterations) != self.iterations
+

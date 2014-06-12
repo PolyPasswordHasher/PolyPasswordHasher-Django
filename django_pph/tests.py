@@ -4,13 +4,13 @@ from django.contrib.auth.hashers import make_password, check_password
 
 class PolyPassHashTestCase(TestCase):
     def test_hasher(self):
-        password1 = make_password('password1')
-        password2 = make_password('password2')
-        password3 = make_password('password3')
+        password1 = make_password('password1', salt='$easalt')
+        password2 = make_password('password2', salt='$easalt')
+        password3 = make_password('password3', salt='$easalt')
 
-        self.assertTrue(password1.startswith('pph$0'))
-        self.assertTrue(password2.startswith('pph$1'))
-        self.assertTrue(password3.startswith('pph$2'))
+        self.assertTrue(password1.startswith('pph$1'))
+        self.assertTrue(password2.startswith('pph$2'))
+        self.assertTrue(password3.startswith('pph$3'))
 
         self.assertTrue(check_password('password1', password1))
         self.assertTrue(check_password('password2', password2))
@@ -27,3 +27,12 @@ class PolyPassHashTestCase(TestCase):
             password = make_password(raw)
             self.assertTrue(check_password(raw, password))
             self.assertLess(len(password), 128)
+
+    def test_unlock_store(self):
+        # TODO;
+        pass
+
+    def test_thresholdless_hash(self):
+        # TODO:
+        pass
+    

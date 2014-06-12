@@ -13,11 +13,12 @@ from .shamirsecret import ShamirSecret
 #   returns a random string consisting of 28 bytes of random data
 #   and 4 bytes of hash to verify the secret upon recombination
 def create_secret(digest):
-
     secret = get_random_string(28)
-    secret_digest = b64encode(secret).decode('ascii').strip()[:4]
+    secret_digest = digest(secret).digest()
+    secret_digest = b64encode(secret_digest).decode('ascii').strip()[:4]
     secret += secret_digest
     return bytes(secret)
+
 
 # verify_secret function
 #   checks wether the secret given contains a proper fingerprint with the
@@ -26,13 +27,11 @@ def create_secret(digest):
 # 
 #   the boolean returned indicates wether it falls under the fingerprint or
 #   not
-def _verify_secret(digest, secret):
-    
+def verify_secret(digest, secret):
     random_data = secret[:28]
     secret_hash = digest(random_data).digest()
     secret_hash_text = b64encode(secret_hash).decode('ascii').strip()[:4]
-    return constant_time_compare(secret[28:],secret_hash)
-
+    return constant_time_compare(secret[28:],secret_hash_text)
 
 
 def do_bytearray_xor(a, b):

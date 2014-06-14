@@ -9,30 +9,6 @@ from django.utils.translation import ugettext_noop as _
 
 from .shamirsecret import ShamirSecret
 
-# create_secret method:
-#   returns a random string consisting of 28 bytes of random data
-#   and 4 bytes of hash to verify the secret upon recombination
-def create_secret(digest):
-    secret = get_random_string(28)
-    secret_digest = digest(secret).digest()
-    secret_digest = b64encode(secret_digest).decode('ascii').strip()[:4]
-    secret += secret_digest
-    return bytes(secret)
-
-
-# verify_secret function
-#   checks wether the secret given contains a proper fingerprint with the
-#   following form:
-#       [28 bytes random data][4 bytes hash of random data]
-# 
-#   the boolean returned indicates wether it falls under the fingerprint or
-#   not
-def verify_secret(digest, secret):
-    random_data = secret[:28]
-    secret_hash = digest(random_data).digest()
-    secret_hash_text = b64encode(secret_hash).decode('ascii').strip()[:4]
-    return constant_time_compare(secret[28:],secret_hash_text)
-
 
 def do_bytearray_xor(a, b):
     a = bytearray(a)
@@ -59,15 +35,15 @@ class PolyPassHasher(BasePasswordHasher):
     digest = hashlib.sha256
 
     is_unlocked = True
-    secret = create_secret(digest)
-    shamirsecretobj = ShamirSecret(5, secret)
+    secret = None
+    shamirsecretobj = None
     thresholdlesskey = secret
 
 
     def encode(self, password, salt, iterations=None):
 
         if self.is_unlocked == False or self.thresholdlesskey is None:
-            raise Excetption("Context is locked")
+            raise Exception("Context is locked")
 
         assert salt is not None
         assert password is not None
@@ -171,10 +147,16 @@ class PolyPassHasher(BasePasswordHasher):
         passhash = b64encode(passhash).decode('ascii').strip()
         return passhash
 
-    # FIXME: this needs to be moved somewhere else, to the admin command
-    def initialize(self):
-      self.secret = self.create_secret()
-      assert self.verify_secret(self.secret) == True
-      self.shamirsecretobj = ShamirSecret(5, self.secret)
-      self.thresholdlesskey = self.secret
-      self.is_unlocked = True
+    # verify_secret function checks wether the secret given contains a
+    # proper fingerprint with the following form: [28 bytes random data][4
+    # bytes hash of random data]
+    # 
+    #   the boolean returned indicates wether it falls under the
+    #   fingerprint or not
+    def verify_secret(self, secret):
+        random_data = secret[:28]
+        secret_hash = self.digest(random_data).digest()
+        secret_hash_text = b64encode(secret_hash).decode('ascii').strip()[:4]
+        return constant_time_compare(secret[28:],secret_hash_text)
+
+

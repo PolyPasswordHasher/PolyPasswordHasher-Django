@@ -1,9 +1,13 @@
 from django.test import TestCase
 from django.contrib.auth.hashers import make_password, check_password
+from django.core import management
+
 
 
 class PolyPassHashTestCase(TestCase):
     def test_hasher(self):
+
+        management.call_command("initialize_pph_context")
         password1 = make_password('password1', salt='$easalt')
         password2 = make_password('password2', salt='$easalt')
         password3 = make_password('password3', salt='$easalt')

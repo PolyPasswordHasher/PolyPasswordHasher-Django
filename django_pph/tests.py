@@ -47,7 +47,7 @@ class PolyPassHashTestCase(TestCase):
         # previous entries in the hasher instance do not mess with each other
         cache.clear()
         management.call_command("initialize_pph_context")
-        
+
         password1 = make_password('password1', salt='$easalt')
         password2 = make_password('password2', salt='$easalt')
         password3 = make_password('password3', salt='$easalt')
@@ -81,7 +81,7 @@ class PolyPassHashTestCase(TestCase):
         # previous entries in the hasher instance do not mess with each other
         cache.clear()
         management.call_command("initialize_pph_context")
-      
+
         # These are threshold accounts for the unlocking phase
         password1 = make_password('password1', salt='$easalt')
         password2 = make_password('password2', salt='$easalt')
@@ -97,9 +97,9 @@ class PolyPassHashTestCase(TestCase):
         hasher.thresholdlesskey = None
 
         self.assertRaises(Exception, make_password, 'thresholdless2')
-       
+
         # partial verification
-        self.assertTrue(check_password('thresholdless1',thresholdless1))
+        self.assertTrue(check_password('thresholdless1', thresholdless1))
 
         # unlock the store
         self.assertTrue(check_password('password1', password1))
@@ -112,11 +112,11 @@ class PolyPassHashTestCase(TestCase):
         thresholdless2 = make_password('thresholdless2')
 
         # verify the passwords
-        self.assertTrue(check_password('thresholdless1',thresholdless1))
-        self.assertTrue(check_password('thresholdless2',thresholdless2))
+        self.assertTrue(check_password('thresholdless1', thresholdless1))
+        self.assertTrue(check_password('thresholdless2', thresholdless2))
 
     def test_partial_verfication(self):
-        
+
         # we create a new secret and clear the cache for each test, so
         # previous entries in the hasher instance do not mess with each other
         management.call_command("initialize_pph_context")

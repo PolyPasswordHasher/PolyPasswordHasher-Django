@@ -7,7 +7,7 @@ from django.contrib.auth.hashers import get_hasher
 from django.utils.crypto import get_random_string
 
 from django_pph.shamirsecret import ShamirSecret
-from django.conf import settings
+from django_pph.settings import SETTINGS
 
 
 class Command(BaseCommand):
@@ -38,9 +38,9 @@ class Command(BaseCommand):
     #   returns a random string consisting of 28 bytes of random data
     #   and 4 bytes of hash to verify the secret upon recombination
     def create_secret(self):
-        secret = get_random_string(settings.PPH_SECRET_LENGTH
-                                   - settings.PPH_SECRET_VERIFICATION_BYTES)
+        secret = get_random_string(SETTINGS['SECRET_LENGTH']
+                                   - SETTINGS['SECRET_VERIFICATION_BYTES'])
         secret_digest = self.digest(secret).digest()
         secret_digest = b64encode(secret_digest).decode('ascii').strip()
-        secret += secret_digest[:settings.PPH_SECRET_VERIFICATION_BYTES]
+        secret += secret_digest[:SETTINGS['SECRET_VERIFICATION_BYTES']]
         return bytes(secret)

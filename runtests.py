@@ -31,10 +31,6 @@ settings.configure(
             'TIMEOUT': None,
         }
     },
-    PPH_THRESHOLD=5,
-    PPH_PARTIALBYTES=2,
-    PPH_SECRET_VERIFICATION_BYTES=4,
-    PPH_SECRET_LENGTH=32
 )
 
 from django.test.utils import get_runner

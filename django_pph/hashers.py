@@ -4,14 +4,13 @@ from base64 import b64encode, b64decode
 
 from Crypto.Cipher import AES
 
+from django.core.cache import cache
 from django.contrib.auth.hashers import BasePasswordHasher, mask_hash
 from django.utils.crypto import constant_time_compare
 from django.utils.translation import ugettext_noop as _
 
 from .shamirsecret import ShamirSecret
-
-from django.core.cache import cache
-from django.conf import settings
+from .settings import SETTINGS
 
 
 def do_bytearray_xor(a, b):
@@ -31,12 +30,11 @@ def do_bytearray_xor(a, b):
 
 
 class PolyPassHasher(BasePasswordHasher):
-
     algorithm = 'pph'
     iterations = 12000
-    threshold = settings.PPH_THRESHOLD
+    threshold = SETTINGS['THRESHOLD']
     nextavailableshare = 1
-    partialbytes = settings.PPH_PARTIALBYTES
+    partialbytes = SETTINGS['PARTIALBYTES']
     digest = hashlib.sha256
 
     is_unlocked = True
@@ -203,8 +201,8 @@ class PolyPassHasher(BasePasswordHasher):
     #   the boolean returned indicates whether it falls under the
     #   fingerprint or not
     def verify_secret(self, secret):
-        secret_length = settings.PPH_SECRET_LENGTH
-        verification_len = settings.PPH_SECRET_VERIFICATION_BYTES
+        secret_length = SETTINGS['SECRET_LENGTH']
+        verification_len = SETTINGS['SECRET_VERIFICATION_BYTES']
         random_data = secret[:secret_length - verification_len]
         secret_hash = self.digest(random_data).digest()
         secret_hash_text = b64encode(secret_hash).decode('ascii').strip()[

@@ -15,6 +15,7 @@ settings.configure(
             'NAME': 'test.db'
         }
     },
+    MIDDLEWARE_CLASSES=(),
     INSTALLED_APPS=(
         'django.contrib.auth',
         'django.contrib.contenttypes',
@@ -38,6 +39,9 @@ settings.configure(
 if hasattr(django, 'setup'):
     django.setup()
 
-from django.test.utils import get_runner
 
-sys.exit(get_runner(settings)().run_tests(['django_pph']))
+if __name__ == '__main__':
+    from django.core.management import execute_from_command_line
+    if not sys.argv[1:]:
+        sys.argv.extend(['test', 'django_pph'])
+    execute_from_command_line(sys.argv)

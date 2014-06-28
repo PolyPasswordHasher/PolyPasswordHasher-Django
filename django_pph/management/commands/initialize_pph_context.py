@@ -5,6 +5,7 @@ from base64 import b64encode
 from django.core.management.base import BaseCommand
 from django.contrib.auth.hashers import get_hasher
 from django.utils.crypto import get_random_string
+from django.utils.six import binary_type
 
 from django_pph.shamirsecret import ShamirSecret
 from django_pph.settings import SETTINGS
@@ -40,7 +41,7 @@ class Command(BaseCommand):
     def create_secret(self):
         secret = get_random_string(SETTINGS['SECRET_LENGTH']
                                    - SETTINGS['SECRET_VERIFICATION_BYTES'])
-        secret_digest = self.digest(secret).digest()
+        secret_digest = self.digest(secret.encode('utf-8')).digest()
         secret_digest = b64encode(secret_digest).decode('ascii').strip()
         secret += secret_digest[:SETTINGS['SECRET_VERIFICATION_BYTES']]
-        return bytes(secret)
+        return binary_type(secret.encode('utf8'))

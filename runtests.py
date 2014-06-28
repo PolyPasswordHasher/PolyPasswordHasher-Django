@@ -1,6 +1,7 @@
 import os
 import sys
 
+import django
 from django.conf import settings
 
 
@@ -32,6 +33,10 @@ settings.configure(
         }
     },
 )
+
+
+if hasattr(django, 'setup'):
+    django.setup()
 
 from django.test.utils import get_runner
 

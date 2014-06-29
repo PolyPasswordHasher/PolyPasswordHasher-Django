@@ -2,7 +2,8 @@ from django.test import TestCase
 from django.contrib.auth.hashers import make_password, check_password
 from django.core import management
 from django.contrib.auth.hashers import get_hasher
-from django.core.cache import cache
+
+from django_pph.utils import cache
 
 
 class PolyPassHashTestCase(TestCase):

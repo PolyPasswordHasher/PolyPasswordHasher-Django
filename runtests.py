@@ -30,6 +30,10 @@ settings.configure(
     CACHES={
         'default': {
             'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        },
+        'pph': {
+            'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
+            'LOCATION': 'pph_cache',
             'TIMEOUT': None,
         }
     },

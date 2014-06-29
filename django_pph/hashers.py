@@ -1,11 +1,8 @@
-from base64 import b64encode, b64decode
+from base64 import b64decode
 
-from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
 from django.contrib.auth.hashers import BasePasswordHasher, mask_hash
-from django.utils.crypto import constant_time_compare as _constant_time_compare
 from django.utils.translation import ugettext_noop as _
-from django.utils import six
 try:
     from collections import OrderedDict
 except ImportError:
@@ -19,36 +16,8 @@ except ImportError:
 
 from .shamirsecret import ShamirSecret
 from .settings import SETTINGS
-
-
-def do_bytearray_xor(a, b):
-    a = bytearray(a)
-    b = bytearray(b)
-
-    assert len(a) == len(b)
-    result = bytearray()
-
-    for pos in range(len(a)):
-        result.append(a[pos] ^ b[pos])
-
-    return result
-
-
-def binary_type(s):
-    if isinstance(s, six.binary_type):
-        return s
-    if six.PY2 or isinstance(s, bytearray):
-        return six.binary_type(s)
-    return six.binary_type(s, 'utf8')
-
-
-def constant_time_compare(val1, val2):
-    """Performs constant_time_compare with consistent typing"""
-    return _constant_time_compare(binary_type(val1), binary_type(val2))
-
-
-b64enc = lambda s: b64encode(s).decode('ascii').strip()
-bin64enc = lambda s: b64enc(binary_type(s))
+from .utils import (LockedException, b64enc, bin64enc, binary_type, cache,
+                    constant_time_compare, do_bytearray_xor)
 
 
 class PolyPassHasher(BasePasswordHasher):
@@ -69,7 +38,7 @@ class PolyPassHasher(BasePasswordHasher):
     def encode(self, password, salt, iterations=None):
 
         if self.is_unlocked is False or self.thresholdlesskey is None:
-            raise Exception("Context is locked")
+            raise LockedException
 
         assert salt is not None
         assert password is not None
@@ -126,8 +95,9 @@ class PolyPassHasher(BasePasswordHasher):
                 share = self._get_share_from_hash(password, salt, original_hash)
 
                 # we check for conflicts before inserting this into our cache
-                if cache.get(sharenumber):
-                    original_share = b64enc(cache.get(sharenumber))
+                value = cache.get(sharenumber)
+                if value is not None:
+                    original_share = b64enc(value)
 
                     new_share = b64enc(share)
                     # if they are not the same
@@ -152,12 +122,9 @@ class PolyPassHasher(BasePasswordHasher):
             # partial verification step, if we are locked, let's try to log the
             # user in
             if self.partialbytes > 0:
-                partial_verification_result = self._partial_verify(
-                    password, salt, original_hash)
-                return partial_verification_result
+                return self._partial_verify(password, salt, original_hash)
 
-        raise Exception("Context is locked right now, "
-                        "we cannot provide authentication!")
+        raise LockedException
 
     def safe_summary(self, encoded):
         algorithm, sharenumber, iterations, salt, hash = encoded.split('$', 4)
@@ -187,7 +154,6 @@ class PolyPassHasher(BasePasswordHasher):
         passhash = bin64enc(passhash)
         passhash += b64enc(saltedpasswordhash[len(saltedpasswordhash)
                                               - self.partialbytes:])
-
         return passhash
 
     def _encrypt_entry(self, password, salt):

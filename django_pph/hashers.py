@@ -24,20 +24,32 @@ class PolyPassHasher(BasePasswordHasher):
     algorithm = 'pph'
     iterations = 12000
     threshold = SETTINGS['THRESHOLD']
-    nextavailableshare = 1
     partialbytes = SETTINGS['PARTIALBYTES']
 
-    is_unlocked = True
-    secret = None
-    shamirsecretobj = None
-    thresholdlesskey = None
+    data = {
+        'is_unlocked': False,
+        'secret': None,
+        'nextavailableshare': 1,
+        'shamirsecretobj': None,
+        'thresholdlesskey': None
+    }
+    defaults = data.copy()
 
     def digest(self, data):
         return SHA256.new(binary_type(data)).digest()
 
-    def encode(self, password, salt, iterations=None):
+    def update(self, **attrs):
+        self.data.update(attrs)
+        cache.set('hasher', self.data)
 
-        if self.is_unlocked is False or self.thresholdlesskey is None:
+    def load(self):
+        self.data = cache.get('hasher') or self.defaults
+
+    def encode(self, password, salt, iterations=None):
+        if not self.data['is_unlocked']:
+            self.load()
+
+        if not self.data['is_unlocked'] or self.data['thresholdlesskey'] is None:
             raise LockedException
 
         assert salt is not None
@@ -46,8 +58,9 @@ class PolyPassHasher(BasePasswordHasher):
         # we pre-parse the input string to verify which kind of entry this
         # belongs to
         if '$' in salt:
-            sharenumber = self.nextavailableshare
-            self.nextavailableshare += 1
+            sharenumber = self.data['nextavailableshare']
+            self.data['nextavailableshare'] += 1
+            self.update()
             salt = salt.strip('$')
         else:
             sharenumber = 0
@@ -73,7 +86,8 @@ class PolyPassHasher(BasePasswordHasher):
                                    salt, passhash)
 
     def verify(self, password, encoded):
-        # check share number w/ '^'
+        if not self.data['is_unlocked']:
+            self.load()
 
         algorithm, sharenumber, iterations, salt, original_hash = encoded.split('$', 4)
 
@@ -81,7 +95,7 @@ class PolyPassHasher(BasePasswordHasher):
 
         sharenumber = int(sharenumber)
 
-        if self.secret is not None and self.thresholdlesskey is not None:
+        if self.data['secret'] is not None and self.data['thresholdlesskey'] is not None:
             if sharenumber != 0:
                 proposed_hash = self._polyhash_entry(password, salt, sharenumber)
             else:
@@ -146,10 +160,10 @@ class PolyPassHasher(BasePasswordHasher):
         private helper that computes a polyhashed entry with a given sharenumber,
         password and salt. Used in hash creation and verification.
         """
-        assert self.shamirsecretobj is not None
+        assert self.data['shamirsecretobj'] is not None
 
         saltedpasswordhash = self.digest(password + salt)
-        shamirsecretdata = self.shamirsecretobj.compute_share(sharenumber)[1]
+        shamirsecretdata = self.data['shamirsecretobj'].compute_share(sharenumber)[1]
         passhash = do_bytearray_xor(saltedpasswordhash, shamirsecretdata)
         passhash = bin64enc(passhash)
         passhash += b64enc(saltedpasswordhash[len(saltedpasswordhash)
@@ -158,10 +172,10 @@ class PolyPassHasher(BasePasswordHasher):
 
     def _encrypt_entry(self, password, salt):
 
-        assert self.thresholdlesskey is not None
+        assert self.data['thresholdlesskey'] is not None
 
         saltedpasswordhash = self.digest(password + salt)
-        passhash = AES.new(self.thresholdlesskey).encrypt(saltedpasswordhash)
+        passhash = AES.new(self.data['thresholdlesskey']).encrypt(saltedpasswordhash)
         passhash = bin64enc(passhash)
         passhash += b64enc(saltedpasswordhash[len(saltedpasswordhash)
                                               - self.partialbytes:])
@@ -214,11 +228,12 @@ class PolyPassHasher(BasePasswordHasher):
             current_share = (int(share), share_value)
             recombination_shares.append(current_share)
 
-        self.shamirsecretobj = ShamirSecret(self.threshold)
-        self.shamirsecretobj.recover_secretdata(recombination_shares)
-        self.secret = self.shamirsecretobj.secretdata
+        self.data['shamirsecretobj'] = ShamirSecret(self.threshold)
+        self.data['shamirsecretobj'].recover_secretdata(recombination_shares)
+        self.data['secret'] = self.data['shamirsecretobj'].secretdata
 
-        if not self.verify_secret(self.secret):
+        if not self.verify_secret(self.data['secret']):
             raise Exception("Couldn't recombine store!")
 
-        self.thresholdlesskey = self.secret
+        self.data['thresholdlesskey'] = self.data['secret']
+        self.update()

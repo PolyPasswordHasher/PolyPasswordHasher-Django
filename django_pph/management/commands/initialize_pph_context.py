@@ -24,8 +24,8 @@ class Command(BaseCommand):
         # hash algorithm that will be used to verify
         self.digest = hasher.digest
 
-        # intialize the whole store, basically generate the secret, create
-        # a shamir secret object and assign the secret to the thresholdlesskey
+        # initialize the whole store, basically generate the secret, create
+        # a Shamir secret object and assign the secret to the thresholdlesskey
         self.initialize(hasher)
 
 

@@ -214,6 +214,38 @@ class PolyPassHasher(BasePasswordHasher):
         return constant_time_compare(secret[secret_length - verification_len:],
                                      secret_hash_text)
 
+    def update_hash_thresholdless(self, hash):
+        """
+        Attempt to encrypt an existing hash with the thresholdless key
+
+        This expects the ascii-encoded version of the hash
+        """
+        byte_hash = b64decode(hash)
+        passhash = AES.new(self.data['thresholdlesskey']).encrypt(byte_hash)
+        passhash = bin64enc(passhash)
+        passhash += b64enc(byte_hash[len(byte_hash) - self.partialbytes:])
+        return passhash
+
+    def update_hash_threshold(self, hash):
+        """
+        Attempt to produce a polyhashed entry with an already existing 
+        hash string
+
+        This expects the ascii-encoded version of the hash
+        """
+        byte_hash = b64decode(hash)
+
+        sharenumber = self.data['nextavailableshare']
+        self.data['nextavailableshare'] += 1
+
+        shamirsecretdata = self.data['shamirsecretobj'].compute_share(sharenumber)[1]
+        passhash = do_bytearray_xor(byte_hash, shamirsecretdata)
+        passhash = bin64enc(passhash)
+        passhash += b64enc(byte_hash[len(byte_hash) - self.partialbytes:])
+        return passhash, sharenumber
+
+
+ 
     def _recombine(self):
         """
         Attempt to restore the secret when a threshold of shares has been met.

@@ -114,6 +114,7 @@ class PolyPasswordHasherTestCase(TestCase):
 
     def test_partial_verfication(self):
 
+        cache.clear()
         password1 = make_share('password1')
 
         # Forcefully lock the context

@@ -3,6 +3,10 @@ from base64 import b64decode
 from django.core.exceptions import ImproperlyConfigured
 from django.contrib.auth.hashers import BasePasswordHasher, mask_hash
 from django.utils.translation import ugettext_noop as _
+from django.utils.crypto import pbkdf2
+
+import hashlib
+
 try:
     from collections import OrderedDict
 except ImportError:
@@ -99,7 +103,8 @@ class PolyPasswordHasher(BasePasswordHasher):
 
         if self.data['secret'] is not None and self.data['thresholdlesskey'] is not None:
             if sharenumber != 0:
-                proposed_hash = self._polyhash_entry(password, salt, sharenumber)
+                proposed_hash = self._polyhash_entry(password, salt,
+                        sharenumber)
             else:
                 proposed_hash = self._encrypt_entry(password, salt)
             return constant_time_compare(original_hash, proposed_hash)
@@ -108,7 +113,8 @@ class PolyPasswordHasher(BasePasswordHasher):
             # TODO: this could be optimized by merging the functionality from
             # _get_share... with _partial_verify...
             if sharenumber != 0:
-                share = self._get_share_from_hash(password, salt, original_hash)
+                share = self._get_share_from_hash(password, salt, original_hash,
+                        iterations)
 
                 # we check for conflicts before inserting this into our cache
                 value = cache.get(sharenumber)
@@ -117,6 +123,7 @@ class PolyPasswordHasher(BasePasswordHasher):
 
                     new_share = b64enc(share)
                     # if they are not the same
+                    print("{} --- {}".format(original_share, new_share))
                     if not constant_time_compare(original_share, new_share):
                         raise Exception("Cached share does not match the new "
                                         " share value!")
@@ -138,7 +145,8 @@ class PolyPasswordHasher(BasePasswordHasher):
             # partial verification step, if we are locked, let's try to log the
             # user in
             if self.partialbytes > 0:
-                return self._partial_verify(password, salt, original_hash)
+                return self._partial_verify(password, salt, original_hash,
+                        iterations)
 
         raise LockedException
 
@@ -164,7 +172,7 @@ class PolyPasswordHasher(BasePasswordHasher):
         """
         assert self.data['shamirsecretobj'] is not None
 
-        saltedpasswordhash = self.digest(password + salt)
+        saltedpasswordhash = self.digest(password, salt, self.iterations)
         shamirsecretdata = self.data['shamirsecretobj'].compute_share(sharenumber)[1]
         passhash = do_bytearray_xor(saltedpasswordhash, shamirsecretdata)
         passhash = bin64enc(passhash)
@@ -176,24 +184,26 @@ class PolyPasswordHasher(BasePasswordHasher):
 
         assert self.data['thresholdlesskey'] is not None
 
-        saltedpasswordhash = self.digest(password + salt)
+        saltedpasswordhash = self.digest(password, salt, self.iterations)
         passhash = AES.new(self.data['thresholdlesskey']).encrypt(saltedpasswordhash)
         passhash = bin64enc(passhash)
         passhash += b64enc(saltedpasswordhash[len(saltedpasswordhash)
                                               - self.partialbytes:])
         return passhash
 
-    def _partial_verify(self, password, salt, passhash):
-        saltedpasswordhash = b64enc(self.digest(password + salt))
+    def _partial_verify(self, password, salt, passhash, iterations):
+        saltedpasswordhash = b64enc(self.digest(password , salt, 
+            iterations))
         partial_bytes = saltedpasswordhash[len(saltedpasswordhash)
                                            - self.partialbytes:]
         original_partial_bytes = passhash[len(passhash) - self.partialbytes:]
+
         return constant_time_compare(partial_bytes, original_partial_bytes)
 
     # private helper to provide shares from hash ^ passhash
-    def _get_share_from_hash(self, password, salt, passhash):
+    def _get_share_from_hash(self, password, salt, passhash, iterations):
         passhash = binary_type(passhash)
-        saltedpasswordhash = self.digest(password + salt)
+        saltedpasswordhash = self.digest(password, salt, iterations)
         byte_passhash = b64decode(passhash[:len(passhash) - self.partialbytes])
         return do_bytearray_xor(byte_passhash, saltedpasswordhash)
 
@@ -211,7 +221,7 @@ class PolyPasswordHasher(BasePasswordHasher):
         secret_length = SETTINGS['SECRET_LENGTH']
         verification_len = SETTINGS['SECRET_VERIFICATION_BYTES']
         random_data = secret[:secret_length - verification_len]
-        secret_hash = self.digest(random_data)
+        secret_hash = self.digest(random_data, None, 1)
         secret_hash_text = b64enc(secret_hash)[:verification_len]
         return constant_time_compare(secret[secret_length - verification_len:],
                                      secret_hash_text)

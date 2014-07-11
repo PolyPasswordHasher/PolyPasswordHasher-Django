@@ -16,7 +16,7 @@ class Migration(DataMigration):
         # Use orm.ModelName to refer to models in this application,
         # and orm['appname.ModelName'] for models in other applications.
 	
-        polypasshasher = get_hasher('pph')
+        polypasswordhasherer = get_hasher('pph')
         management.call_command('initialize_pph_context')
         next_available_share = 1
 	
@@ -33,12 +33,12 @@ class Migration(DataMigration):
             # hasher.data['nextavailableshare']
             # hasher.update()
             # newhash = hasher._polyhash_entry(hash
-                new_hash, sharenumber = polypasshasher.update_hash_threshold(hash)
+                new_hash, sharenumber = polypasswordhasherer.update_hash_threshold(hash)
                 new_password = "{}${}${}${}${}".format('pph',sharenumber,
                         iterations, salt, new_hash)
                 print("threshold: {} -> {}".format(hash, new_hash))
             else:
-                new_hash = polypasshasher.update_hash_thresholdless(hash)
+                new_hash = polypasswordhasherer.update_hash_thresholdless(hash)
                 new_password = "{}${}${}${}${}".format('pph',0,iterations,
                     salt, new_hash)
                 print("thresholdless: {} -> {}".format(hash, new_hash))

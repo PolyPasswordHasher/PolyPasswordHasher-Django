@@ -12,7 +12,7 @@ try:
     from Crypto.Cipher import AES
     from Crypto.Hash import SHA256
 except ImportError:
-    raise ImproperlyConfigured('You must have PyCrypto installed in order to use the PolyPassHasher')
+    raise ImproperlyConfigured('You must have PyCrypto installed in order to use the PolyPasswordHasherer')
 
 from .shamirsecret import ShamirSecret
 from .settings import SETTINGS
@@ -20,7 +20,7 @@ from .utils import (LockedException, b64enc, bin64enc, binary_type, cache,
                     constant_time_compare, do_bytearray_xor)
 
 
-class PolyPassHasher(BasePasswordHasher):
+class PolyPasswordHasherer(BasePasswordHasher):
     algorithm = 'pph'
     iterations = 12000
     threshold = SETTINGS['THRESHOLD']

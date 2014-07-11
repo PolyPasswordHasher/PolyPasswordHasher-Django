@@ -1,4 +1,4 @@
-PolyPassHash-Django
+PolyPasswordHasher-Django
 ===================
 
-Django password hasher using the PolyPassHash algo
+Django password hasher using the PolyPasswordHasher algo

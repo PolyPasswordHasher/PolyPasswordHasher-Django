@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='django-polypasshash',
+    name='django-polypasswordhasher',
     version='0.1.0',
     packages=find_packages(),
     zip_safe=False,

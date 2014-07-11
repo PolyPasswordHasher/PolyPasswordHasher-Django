@@ -25,7 +25,7 @@ settings.configure(
     ),
     ROOT_URLCONF='runtests',
     PASSWORD_HASHERS=(
-        'django_pph.hashers.PolyPasswordHasherer',
+        'django_pph.hashers.PolyPasswordHasher',
     ),
     CACHES={
         'default': {

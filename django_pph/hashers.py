@@ -20,7 +20,7 @@ from .utils import (LockedException, b64enc, bin64enc, binary_type, cache,
                     constant_time_compare, do_bytearray_xor)
 
 
-class PolyPasswordHasherer(BasePasswordHasher):
+class PolyPasswordHasher(BasePasswordHasher):
     algorithm = 'pph'
     iterations = 12000
     threshold = SETTINGS['THRESHOLD']
@@ -35,8 +35,10 @@ class PolyPasswordHasherer(BasePasswordHasher):
     }
     defaults = data.copy()
 
-    def digest(self, data):
-        return SHA256.new(binary_type(data)).digest()
+    #def digest(self, data):
+    #    return SHA256.new(binary_type(data)).digest()
+    def digest(self, password, salt, iterations):
+        return pbkdf2(password, salt, iterations, digest=hashlib.sha256)
 
     def update(self, **attrs):
         self.data.update(attrs)

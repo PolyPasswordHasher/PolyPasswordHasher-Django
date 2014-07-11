@@ -16,7 +16,7 @@ def check(password, encoded):
     return check_password(password, encoded,  preferred='pph')
 
 
-class PolyPassHashTestCase(TestCase):
+class PolyPasswordHasherTestCase(TestCase):
     hasher = get_hasher('pph')
 
     def test_hasher(self):

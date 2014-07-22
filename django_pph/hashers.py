@@ -5,7 +5,11 @@ from django.contrib.auth.hashers import BasePasswordHasher, mask_hash
 from django.utils.translation import ugettext_noop as _
 from django.utils.crypto import pbkdf2
 
+from django.contrib.auth.models import User
+
 import hashlib
+import logging
+import datetime
 
 try:
     from collections import OrderedDict
@@ -35,12 +39,12 @@ class PolyPasswordHasher(BasePasswordHasher):
         'secret': None,
         'nextavailableshare': 1,
         'shamirsecretobj': None,
-        'thresholdlesskey': None
+        'thresholdlesskey': None,
+        'last_unlocked' : datetime.datetime.utcnow(),
     }
     defaults = data.copy()
+    logger = logging.getLogger('django.security.PPH')
 
-    #def digest(self, data):
-    #    return SHA256.new(binary_type(data)).digest()
     def digest(self, password, salt, iterations):
         return pbkdf2(password, salt, iterations, digest=hashlib.sha256)
 
@@ -55,8 +59,6 @@ class PolyPasswordHasher(BasePasswordHasher):
         if not self.data['is_unlocked']:
             self.load()
 
-        if not self.data['is_unlocked'] or self.data['thresholdlesskey'] is None:
-            raise LockedException
 
         assert salt is not None
         assert password is not None
@@ -73,6 +75,16 @@ class PolyPasswordHasher(BasePasswordHasher):
 
         if iterations is None:
             iterations = self.iterations
+        
+        # in case we are locked, we can do a normal hashing procedure and then
+        # expect to update the user after we recover the secret
+        if not self.data['is_unlocked'] or \
+                self.data['thresholdlesskey'] is None:
+            passhash = self.digest(password, salt, iterations)
+            passhash = b64enc(passhash)
+            self.logger.debug("creating locked-account {}".format(passhash))
+            return "%s$-%s$%d$%s$%s" % (self.algorithm, sharenumber, iterations,
+                    salt, passhash)
 
         # create_account(password, salt)
         # shareN + ^ + salt = a share
@@ -95,19 +107,45 @@ class PolyPasswordHasher(BasePasswordHasher):
         if not self.data['is_unlocked']:
             self.load()
 
-        algorithm, sharenumber, iterations, salt, original_hash = encoded.split('$', 4)
+        algorithm, sharenumber, iterations, salt, original_hash = \
+                encoded.split('$', 4)
 
         assert algorithm == self.algorithm
+        
+        # check if this is a non pph-protected hash, and just do normal 
+        # verification for it.
+        if sharenumber.startswith('-'):
+            passhash = self.digest(password, salt, iterations)
+            passhash = b64enc(passhash)
+            self.logger.debug("verifying a locked account {}".format(passhash))
+            return constant_time_compare(passhash, original_hash)
 
+        
         sharenumber = int(sharenumber)
 
-        if self.data['secret'] is not None and self.data['thresholdlesskey'] is not None:
+        if self.data['secret'] is not None and \
+                self.data['thresholdlesskey'] is not None:
+
             if sharenumber != 0:
                 proposed_hash = self._polyhash_entry(password, salt,
                         sharenumber)
+
             else:
                 proposed_hash = self._encrypt_entry(password, salt)
+
+            # We will also check the partial verification to notify of possible
+            # break-in attempts
+            partial_result = self._partial_verify(password, salt, original_hash,
+                iterations, sharenumber)
+            result = constant_time_compare(original_hash, proposed_hash)
+            
+            if partial_result and not result:
+                self.logger.error("Failed login with correct partial bytes. " + 
+                            "Possible database leak detected! The offending " +
+                            "Hash is: {}".format(original_hash))
+            
             return constant_time_compare(original_hash, proposed_hash)
+
         else:
             # try to infer the share from the information given
             # TODO: this could be optimized by merging the functionality from
@@ -123,7 +161,6 @@ class PolyPasswordHasher(BasePasswordHasher):
 
                     new_share = b64enc(share)
                     # if they are not the same
-                    print("{} --- {}".format(original_share, new_share))
                     if not constant_time_compare(original_share, new_share):
                         raise Exception("Cached share does not match the new "
                                         " share value!")
@@ -145,8 +182,9 @@ class PolyPasswordHasher(BasePasswordHasher):
             # partial verification step, if we are locked, let's try to log the
             # user in
             if self.partialbytes > 0:
-                return self._partial_verify(password, salt, original_hash,
-                        iterations)
+                result = self._partial_verify(password, salt, original_hash,
+                        iterations, sharenumber)
+                return result
 
         raise LockedException
 
@@ -167,13 +205,14 @@ class PolyPasswordHasher(BasePasswordHasher):
 
     def _polyhash_entry(self, password, salt, sharenumber):
         """
-        private helper that computes a polyhashed entry with a given sharenumber,
-        password and salt. Used in hash creation and verification.
+        private helper that computes a polyhashed entry with a given
+        sharenumber, password and salt. Used in hash creation and verification.
         """
         assert self.data['shamirsecretobj'] is not None
 
         saltedpasswordhash = self.digest(password, salt, self.iterations)
-        shamirsecretdata = self.data['shamirsecretobj'].compute_share(sharenumber)[1]
+        shamirsecretdata = self.data['shamirsecretobj'].compute_share(
+                sharenumber)[1]
         passhash = do_bytearray_xor(saltedpasswordhash, shamirsecretdata)
         passhash = bin64enc(passhash)
         passhash += b64enc(saltedpasswordhash[len(saltedpasswordhash)
@@ -185,23 +224,42 @@ class PolyPasswordHasher(BasePasswordHasher):
         assert self.data['thresholdlesskey'] is not None
 
         saltedpasswordhash = self.digest(password, salt, self.iterations)
-        passhash = AES.new(self.data['thresholdlesskey']).encrypt(saltedpasswordhash)
+        passhash = AES.new(self.data['thresholdlesskey']).encrypt(
+                saltedpasswordhash)
         passhash = bin64enc(passhash)
         passhash += b64enc(saltedpasswordhash[len(saltedpasswordhash)
                                               - self.partialbytes:])
         return passhash
 
-    def _partial_verify(self, password, salt, passhash, iterations):
+    def _partial_verify(self, password, salt, passhash, iterations, 
+            sharenumber):
+
         saltedpasswordhash = b64enc(self.digest(password , salt, 
             iterations))
         partial_bytes = saltedpasswordhash[len(saltedpasswordhash)
                                            - self.partialbytes:]
         original_partial_bytes = passhash[len(passhash) - self.partialbytes:]
+        result = constant_time_compare(partial_bytes, original_partial_bytes)
 
-        return constant_time_compare(partial_bytes, original_partial_bytes)
+        # FIXME this might make us vulnerable to timing attacks
+        if result:
+            # we will populate a list with the hashes that have been
+            # partially verificated. We will check this list for consistency
+            # once the secret is recovered.
+            partial_verificated_hashes = cache.get('partial_hashes')
+            if partial_verificated_hashes is None:
+                partial_verificated_hashes = {}
+
+            if passhash not in partial_verificated_hashes:
+                partial_verificated_hashes[passhash] = (sharenumber, 
+                        saltedpasswordhash) 
+            cache.set('partial_hashes', partial_verificated_hashes)
+
+        return result
 
     # private helper to provide shares from hash ^ passhash
     def _get_share_from_hash(self, password, salt, passhash, iterations):
+
         passhash = binary_type(passhash)
         saltedpasswordhash = self.digest(password, salt, iterations)
         byte_passhash = b64decode(passhash[:len(passhash) - self.partialbytes])
@@ -232,6 +290,7 @@ class PolyPasswordHasher(BasePasswordHasher):
 
         This expects the ascii-encoded version of the hash
         """
+
         byte_hash = b64decode(hash)
         passhash = AES.new(self.data['thresholdlesskey']).encrypt(byte_hash)
         passhash = bin64enc(passhash)
@@ -245,18 +304,19 @@ class PolyPasswordHasher(BasePasswordHasher):
 
         This expects the ascii-encoded version of the hash
         """
+
         byte_hash = b64decode(hash)
 
         sharenumber = self.data['nextavailableshare']
         self.data['nextavailableshare'] += 1
+        self.update()
 
-        shamirsecretdata = self.data['shamirsecretobj'].compute_share(sharenumber)[1]
+        shamirsecretdata = self.data['shamirsecretobj'].compute_share(
+                sharenumber)[1]
         passhash = do_bytearray_xor(byte_hash, shamirsecretdata)
         passhash = bin64enc(passhash)
         passhash += b64enc(byte_hash[len(byte_hash) - self.partialbytes:])
         return passhash, sharenumber
-
-
  
     def _recombine(self):
         """
@@ -280,4 +340,61 @@ class PolyPasswordHasher(BasePasswordHasher):
             raise Exception("Couldn't recombine store!")
 
         self.data['thresholdlesskey'] = self.data['secret']
+        self.data['is_unlocked']=1
+
+        self._verify_previous_hashes()
+        self._update_locked_hashes()
+
+        self.data['last_unlocked'] = datetime.datetime.utcnow()
         self.update()
+
+    def _verify_previous_hashes(self):
+        partially_verified_hashes = cache.get('partial_hashes')
+
+        if partially_verified_hashes is None:
+            return
+
+        for original_hash in partially_verified_hashes:
+            sharenumber, saltedhash = partially_verified_hashes[original_hash]
+
+            # We only verify thresholdless accounts because threshold accounts
+            # would fail in the recombination phase. 
+            if sharenumber == 0:
+                byte_hash = b64decode(saltedhash)
+                passhash = AES.new(
+                        self.data['thresholdlesskey']).encrypt(byte_hash)
+                passhash = bin64enc(passhash)
+                hashlen = len(passhash)
+                if not constant_time_compare(passhash, original_hash[:hashlen]):
+                        self.logger.error("original hash mismatches partial " +
+                        "verification! Possible break-in detected! The " +
+                        "offending hash is {}".format(original_hash[:hashlen]))
+
+    def _update_locked_hashes(self):
+        all_users = User.objects.filter(
+                date_joined__gte=self.data['last_unlocked'])
+
+        assert self.data['is_unlocked'] == 1
+        assert self.data['thresholdlesskey'] is not None
+        assert self.data['secret'] is not None
+
+        for user in all_users:
+            algorithm, sharenumber, iterations, salt, original_hash = \
+                    user.password.split("$",4)
+            if sharenumber.startswith('-'):
+                sharenumber.strip('-')
+                sharenumber = int(sharenumber)
+                if sharenumber == 0:
+                    passhash = self.update_hash_thresholdless(original_hash)
+                    password = "%s$%d$%s$%s$%s" % (algorithm, sharenumber, 
+                            iterations, salt, passhash)
+                    user.password = password
+                else:
+                    passhash, sharenumber= update_hash_threshold(original_hash)
+                    password = "%s$%d$%s$%s$%s" % (algorithm, sharenumber, 
+                            iterations, salt. passhash)
+                    user.password = password
+
+                user.save()
+
+        return

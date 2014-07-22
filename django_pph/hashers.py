@@ -20,12 +20,14 @@ try:
     from Crypto.Cipher import AES
     from Crypto.Hash import SHA256
 except ImportError:
-    raise ImproperlyConfigured('You must have PyCrypto installed in order to use the PolyPasswordHasherer')
+    raise ImproperlyConfigured('You must have PyCrypto installed in order to use the PolyPasswordHasher')
 
 from .shamirsecret import ShamirSecret
 from .settings import SETTINGS
-from .utils import (LockedException, b64enc, bin64enc, binary_type, cache,
+from .utils import (LockedException, b64enc, bin64enc, binary_type, get_cache,
                     constant_time_compare, do_bytearray_xor)
+
+cache = get_cache('pph')
 
 
 class PolyPasswordHasher(BasePasswordHasher):

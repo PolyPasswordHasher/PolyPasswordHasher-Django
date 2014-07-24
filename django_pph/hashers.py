@@ -33,6 +33,8 @@ logger = logging.getLogger('django.security.PPH')
 class PolyPasswordHasher(BasePasswordHasher):
     algorithm = 'pph'
     iterations = 12000
+
+    # to set these values, overwrite the PPH_SETTINGS variable
     threshold = SETTINGS['THRESHOLD']
     partialbytes = SETTINGS['PARTIALBYTES']
 
@@ -84,8 +86,8 @@ class PolyPasswordHasher(BasePasswordHasher):
             passhash = self.digest(password, salt, iterations)
             passhash = b64enc(passhash)
             logger.debug("creating locked-account {}".format(passhash))
-            return "%s$-%s$%d$%s$%s" % (self.algorithm, sharenumber, iterations,
-                    salt, passhash)
+            return "{}$-{}${}${}${}".format(self.algorithm, sharenumber,
+                    iterations, salt, passhash)
 
         # create_account(password, salt)
         # shareN + ^ + salt = a share
@@ -101,8 +103,8 @@ class PolyPasswordHasher(BasePasswordHasher):
         else:
             passhash = self._polyhash_entry(password, salt, sharenumber)
 
-        return "%s$%d$%d$%s$%s" % (self.algorithm, sharenumber, iterations,
-                                   salt, passhash)
+        return "{}${}${}${}${}".format(self.algorithm, sharenumber,
+                iterations, salt, passhash)
 
     def verify(self, password, encoded):
         if not self.data['is_unlocked']:
@@ -386,13 +388,13 @@ class PolyPasswordHasher(BasePasswordHasher):
                 sharenumber = int(sharenumber)
                 if sharenumber == 0:
                     passhash = self.update_hash_thresholdless(original_hash)
-                    password = "{s}${d}${s}${s}${s}".format(algorithm,
+                    password = "{}${}${}${}${}".format(algorithm,
                             sharenumber, iterations, salt, passhash)
                     user.password = password
                 else:
                     passhash, sharenumber= update_hash_threshold(original_hash)
-                    password = "%s$%d$%s$%s$%s" % (algorithm, sharenumber, 
-                            iterations, salt. passhash)
+                    password = "{}${}${}${}${}".format(algorithm,
+                            sharenumber, iterations, salt. passhash)
                     user.password = password
 
                 user.save()

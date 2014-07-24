@@ -1,7 +1,8 @@
 from django.test import TestCase
 from django.contrib.auth.hashers import make_password, check_password, get_hasher
 
-from django_pph.utils import cache
+from django_pph.utils import get_cache
+cache = get_cache('pph')
 
 
 def make(password):
@@ -93,7 +94,8 @@ class PolyPasswordHasherTestCase(TestCase):
             thresholdlesskey=None
         )
 
-        self.assertRaises(Exception, make, 'thresholdless2')
+        # NOTICE: since we are now able to provide hashes even when the context
+        # is unlocked, I removed the "self.assertRaises".
 
         # partial verification
         self.assertTrue(check('thresholdless1', thresholdless1))

@@ -22,9 +22,11 @@ from django_pph.utils import cache, bin64enc, binary_type, do_bytearray_xor
 # threshold-pool of users.
 def demote_user(username):
 
-    hasher = get_hasher('pph')
     target_user = User.objects.filter(username=username)
-    assert len(target_user)==1
+    assert len(target_user)==1 , \
+            "There is no such user or the database is corrupted"
+
+    hasher = get_hasher('pph')
     hasher.load()
 
     # for safety purposes, we will scan the database to guarantee that there
@@ -44,7 +46,7 @@ def demote_user(username):
 
     # now, perform the demotion
     for user in target_user:
-        print("should update {}".format(user.password)) 
+
         encoded = user.password
         algorithm, sharenumber, iterations, salt, original_hash = \
                 encoded.split('$', 4)
@@ -59,7 +61,7 @@ def demote_user(username):
         share = hasher.data['shamirsecretobj'].compute_share(
                 sharenumber)[1]
         byte_hash = do_bytearray_xor(share, byte_hash)
-        import pdb; pdb.set_trace()  
+
         passhash = AES.new(hasher.data['thresholdlesskey']).encrypt(
             buffer(byte_hash))
         passhash = b64encode(passhash)

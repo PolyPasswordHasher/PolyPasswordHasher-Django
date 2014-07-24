@@ -2,8 +2,6 @@ from django.core.management.base import BaseCommand
 from django.contrib.auth.hashers import get_hasher
 from django.contrib.auth.models import User
 
-from django.utils.crypto import get_random_string
-
 from django_pph.shamirsecret import ShamirSecret
 from django_pph.settings import SETTINGS
 from django_pph.utils import cache, bin64enc, binary_type

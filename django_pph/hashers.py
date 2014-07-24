@@ -28,7 +28,7 @@ from .utils import (LockedException, b64enc, bin64enc, binary_type, get_cache,
                     constant_time_compare, do_bytearray_xor)
 
 cache = get_cache('pph')
-
+logger = logging.getLogger('django.security.PPH')
 
 class PolyPasswordHasher(BasePasswordHasher):
     algorithm = 'pph'
@@ -45,7 +45,6 @@ class PolyPasswordHasher(BasePasswordHasher):
         'last_unlocked' : datetime.datetime.utcnow(),
     }
     defaults = data.copy()
-    logger = logging.getLogger('django.security.PPH')
 
     def digest(self, password, salt, iterations):
         return pbkdf2(password, salt, iterations, digest=hashlib.sha256)
@@ -84,7 +83,7 @@ class PolyPasswordHasher(BasePasswordHasher):
                 self.data['thresholdlesskey'] is None:
             passhash = self.digest(password, salt, iterations)
             passhash = b64enc(passhash)
-            self.logger.debug("creating locked-account {}".format(passhash))
+            logger.debug("creating locked-account {}".format(passhash))
             return "%s$-%s$%d$%s$%s" % (self.algorithm, sharenumber, iterations,
                     salt, passhash)
 
@@ -96,7 +95,7 @@ class PolyPasswordHasher(BasePasswordHasher):
         # pbkdf2 is hash function
 
         # we verify whether the entry is to be a threshold or thresholdless
-        # account. We account threshold accounts f
+        # account.
         if sharenumber == 0 or sharenumber is None:
             passhash = self._encrypt_entry(password, salt)
         else:
@@ -119,7 +118,7 @@ class PolyPasswordHasher(BasePasswordHasher):
         if sharenumber.startswith('-'):
             passhash = self.digest(password, salt, iterations)
             passhash = b64enc(passhash)
-            self.logger.debug("verifying a locked account {}".format(passhash))
+            logger.debug("verifying a locked account {}".format(passhash))
             return constant_time_compare(passhash, original_hash)
 
         
@@ -142,7 +141,7 @@ class PolyPasswordHasher(BasePasswordHasher):
             result = constant_time_compare(original_hash, proposed_hash)
             
             if partial_result and not result:
-                self.logger.error("Failed login with correct partial bytes. " + 
+                logger.error("Failed login with correct partial bytes. " + 
                             "Possible database leak detected! The offending " +
                             "Hash is: {}".format(original_hash))
             
@@ -243,7 +242,6 @@ class PolyPasswordHasher(BasePasswordHasher):
         original_partial_bytes = passhash[len(passhash) - self.partialbytes:]
         result = constant_time_compare(partial_bytes, original_partial_bytes)
 
-        # FIXME this might make us vulnerable to timing attacks
         if result:
             # we will populate a list with the hashes that have been
             # partially verificated. We will check this list for consistency
@@ -368,7 +366,7 @@ class PolyPasswordHasher(BasePasswordHasher):
                 passhash = bin64enc(passhash)
                 hashlen = len(passhash)
                 if not constant_time_compare(passhash, original_hash[:hashlen]):
-                        self.logger.error("original hash mismatches partial " +
+                        logger.error("original hash mismatches partial " +
                         "verification! Possible break-in detected! The " +
                         "offending hash is {}".format(original_hash[:hashlen]))
 
@@ -388,8 +386,8 @@ class PolyPasswordHasher(BasePasswordHasher):
                 sharenumber = int(sharenumber)
                 if sharenumber == 0:
                     passhash = self.update_hash_thresholdless(original_hash)
-                    password = "%s$%d$%s$%s$%s" % (algorithm, sharenumber, 
-                            iterations, salt, passhash)
+                    password = "{s}${d}${s}${s}${s}".format(algorithm,
+                            sharenumber, iterations, salt, passhash)
                     user.password = password
                 else:
                     passhash, sharenumber= update_hash_threshold(original_hash)

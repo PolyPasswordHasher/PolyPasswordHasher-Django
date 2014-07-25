@@ -23,7 +23,7 @@ from django_pph.utils import cache, bin64enc, binary_type, do_bytearray_xor
 def demote_user(username):
 
     target_user = User.objects.filter(username=username)
-    assert len(target_user)==1 , \
+    assert len(target_user) == 1 , \
             "There is no such user or the database is corrupted"
 
     hasher = get_hasher('pph')
@@ -48,32 +48,9 @@ def demote_user(username):
     for user in target_user:
 
         encoded = user.password
-        algorithm, sharenumber, iterations, salt, original_hash = \
-                encoded.split('$', 4)
-        assert algorithm == 'pph'
-        sharenumber = int(sharenumber)
-        assert sharenumber > 0
-        assert hasher.data['is_unlocked'] == 1
-        
-        partial_bytes = hasher.partialbytes
-        byte_hash = b64decode(
-                original_hash[:len(original_hash) - partial_bytes])
-        share = hasher.data['shamirsecretobj'].compute_share(
-                sharenumber)[1]
-        byte_hash = do_bytearray_xor(share, byte_hash)
-
-        passhash = AES.new(hasher.data['thresholdlesskey']).encrypt(
-            buffer(byte_hash))
-        passhash = b64encode(passhash)
-        passhash += b64encode(
-                byte_hash[len(byte_hash) - hasher.partialbytes:])
-
-        password = "%s$%d$%s$%s$%s" % (hasher.algorithm,
-                0, iterations, salt, passhash)
-
-        user.password = password
+        new_password = hasher.demote_hash(encoded)
+        user.password = new_password
         user.save()
-
 
 class Command(BaseCommand):
 
@@ -89,12 +66,3 @@ class Command(BaseCommand):
         # FIXME: we should support the options arguments or detect different
         # django versions for it.
         demote_user(args[0])
-
-               
-
-
-
-
-            
-        
-    

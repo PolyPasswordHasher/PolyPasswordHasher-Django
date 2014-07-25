@@ -1,4 +1,4 @@
-from base64 import b64decode
+from base64 import b64decode, b64encode
 
 from django.core.exceptions import ImproperlyConfigured
 from django.contrib.auth.hashers import BasePasswordHasher, mask_hash
@@ -82,7 +82,8 @@ class PolyPasswordHasher(BasePasswordHasher):
         # in case we are locked, we can do a normal hashing procedure and then
         # expect to update the user after we recover the secret
         if not self.data['is_unlocked'] or \
-                self.data['thresholdlesskey'] is None:
+                self.data['thresholdlesskey'] is None or \
+                self.data['secret'] is None:
             passhash = self.digest(password, salt, iterations)
             passhash = b64enc(passhash)
             logger.debug("creating locked-account {}".format(passhash))
@@ -225,6 +226,7 @@ class PolyPasswordHasher(BasePasswordHasher):
     def _encrypt_entry(self, password, salt):
 
         assert self.data['thresholdlesskey'] is not None
+        assert self.data['secret'] is not None
 
         saltedpasswordhash = self.digest(password, salt, self.iterations)
         passhash = AES.new(self.data['thresholdlesskey']).encrypt(
@@ -295,7 +297,7 @@ class PolyPasswordHasher(BasePasswordHasher):
 
         byte_hash = b64decode(hash)
         passhash = AES.new(self.data['thresholdlesskey']).encrypt(byte_hash)
-        passhash = bin64enc(passhash)
+        passhash = b64enc(passhash)
         passhash += b64enc(byte_hash[len(byte_hash) - self.partialbytes:])
         return passhash
 
@@ -316,7 +318,7 @@ class PolyPasswordHasher(BasePasswordHasher):
         shamirsecretdata = self.data['shamirsecretobj'].compute_share(
                 sharenumber)[1]
         passhash = do_bytearray_xor(byte_hash, shamirsecretdata)
-        passhash = bin64enc(passhash)
+        passhash = b64enc(passhash)
         passhash += b64enc(byte_hash[len(byte_hash) - self.partialbytes:])
         return passhash, sharenumber
  
@@ -365,7 +367,7 @@ class PolyPasswordHasher(BasePasswordHasher):
                 byte_hash = b64decode(saltedhash)
                 passhash = AES.new(
                         self.data['thresholdlesskey']).encrypt(byte_hash)
-                passhash = bin64enc(passhash)
+                passhash = b64enc(passhash)
                 hashlen = len(passhash)
                 if not constant_time_compare(passhash, original_hash[:hashlen]):
                         logger.error("original hash mismatches partial " +
@@ -400,3 +402,89 @@ class PolyPasswordHasher(BasePasswordHasher):
                 user.save()
 
         return
+
+    def promote_hash(self, passhash):
+
+        algorithm, sharenumber, iterations, salt, original_hash = \
+                passhash.split('$', 4)
+        assert algorithm == 'pph'
+
+        if self.data['is_unlocked'] == 1:
+
+            if sharenumber.startswith('-'):
+                sharenumber.strip('-')
+            else:
+                # should decrypt
+                byte_hash = b64decode(original_hash)
+                original_hash = AES.new(self.data['thresholdlesskey']).decrypt(
+                     buffer(byte_hash))
+                original_hash = b64enc(original_hash)
+
+
+            sharenumber = int(sharenumber)
+            assert sharenumber == 0
+
+            passhash, sharenumber = self.update_hash_threshold(
+                    original_hash)
+            password = "%s$%d$%s$%s$%s" % (self.algorithm,
+                    sharenumber, iterations, salt, passhash)
+
+            return password
+        
+        else:
+            assert sharenumber.startswith('-'), \
+                    'Impossible to promote an encrypted hash when locked!'
+
+            sharenumber.strip('-')
+            sharenumber = int(sharenumber)
+            assert sharenumber == 0
+
+            new_sharenumber = int(self.data['nextavailableshare'])
+            self.data['nextavailableshare'] += 1
+            self.update()
+            password = "%s$-%d$%s$%s$%s" % (self.algorithm,
+                    new_sharenumber, iterations, salt, original_hash)
+
+            return password
+
+
+    def demote_hash(self, passhash):
+
+        algorithm, sharenumber, iterations, salt, original_hash = \
+                passhash.split('$', 4)
+
+        assert algorithm == 'pph'
+        sharenumber = int(sharenumber)
+        assert sharenumber != 0
+        
+        if sharenumber > 0:
+
+            assert self.data['thresholdlesskey'] is not None
+            assert self.data['shamirsecretobj'] is not None
+
+            partial_bytes = self.partialbytes
+            byte_hash = b64decode(
+                    original_hash[:len(original_hash) - partial_bytes])
+            share = self.data['shamirsecretobj'].compute_share(
+                    sharenumber)[1]
+            byte_hash = do_bytearray_xor(share, byte_hash)
+
+            passhash = AES.new(self.data['thresholdlesskey']).encrypt(
+                buffer(byte_hash))
+            passhash = b64enc(passhash)
+            passhash += b64enc(
+                    byte_hash[len(byte_hash) - partial_bytes:])
+
+            password = "%s$%d$%s$%s$%s" % (self.algorithm,
+                    0, iterations, salt, passhash)
+
+        else:
+
+            password = "{}$-0${}${}${}".format(self.algorithm, iterations,
+                    salt, original_hash)
+
+
+
+        return password
+
+

@@ -239,11 +239,14 @@ class PolyPasswordHasher(BasePasswordHasher):
     def _partial_verify(self, password, salt, passhash, iterations, 
             sharenumber):
 
-        saltedpasswordhash = b64enc(self.digest(password , salt, 
-            iterations))
-        partial_bytes = saltedpasswordhash[len(saltedpasswordhash)
-                                           - self.partialbytes:]
-        original_partial_bytes = passhash[len(passhash) - self.partialbytes:]
+        saltedpasswordhash = self.digest(password , salt, iterations)
+        partial_bytes = b64enc(saltedpasswordhash[len(saltedpasswordhash)
+                                           - self.partialbytes:])
+
+        # we user the length of the partial_bytes string since that's the
+        # correct length of partial bytes when using b64 encoding
+        original_partial_bytes = passhash[len(passhash) - len(partial_bytes):]
+
         result = constant_time_compare(partial_bytes, original_partial_bytes)
 
         if result:

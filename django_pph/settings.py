@@ -2,7 +2,7 @@ from django.conf import settings
 
 
 SETTINGS = {
-    'THRESHOLD': 5,
+    'THRESHOLD': 3,
     'PARTIALBYTES': 2,
     'SECRET_VERIFICATION_BYTES': 4,
     'SECRET_LENGTH': 32,

@@ -6,6 +6,10 @@ from base64 import b64encode
 
 from copy import deepcopy
 
+from django_pph.utils import get_cache, constant_time_compare
+from django_pph.management.commands.initialize_pph_context import Command as \
+        pph_init
+
 cache = get_cache('pph')
 
 
@@ -355,3 +359,18 @@ class PolyPasswordHasherTestCase(TestCase):
         self.assertTrue(check(password, pass_string))
 
 
+    # this function tests the secret creation capabilities. We will generate
+    # a series of valid and invalid secrets and expect the function to be able
+    # to discern between them 
+    def test_secret_creation_and_verification(self):
+
+        # create a valid secret
+        valid_secret = pph_init().create_secret() 
+
+        # invalid secret will have its first value inverted
+        invalid_secret = str(~ord(valid_secret[0])) + valid_secret[1:]
+
+
+        # now lets verify both
+        self.assertTrue(self.hasher.verify_secret(valid_secret))
+        self.assertTrue(not self.hasher.verify_secret(invalid_secret))

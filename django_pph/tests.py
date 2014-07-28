@@ -1,12 +1,11 @@
 from django.test import TestCase
 from django.contrib.auth.hashers import make_password, check_password, get_hasher
-from django.utils.crypto import pbkdf2
+from django.utils.crypto import pbkdf2, get_random_string
 from hashlib import sha256
 from base64 import b64encode
 
 from copy import deepcopy
 
-from django_pph.utils import get_cache
 cache = get_cache('pph')
 
 
@@ -55,6 +54,7 @@ class PolyPasswordHasherTestCase(TestCase):
         self.assertLess(len(password1), 128)
         self.assertLess(len(password2), 128)
         self.assertLess(len(password3), 128)
+
 
     def test_total_shares(self):
 
@@ -294,5 +294,64 @@ class PolyPasswordHasherTestCase(TestCase):
             self.hasher.demote_hash(password1)
 
 
+    # we attempt to test a "migration" procedure using the hasher instance. 
+    # To test this, we will create the has both ways: fist from the original 
+    # data and one by updatng our resulting hash.
+    def test_update_hash_threshold(self): 
+   
+        # we will remove the $ because we are going to create the entry
+        # artificially
+        salt = get_random_string(6).strip('$')
 
-        
+        password = 'password1'
+        iterations = 12000
+
+        pbkdf2_encoded_password = pbkdf2(password, salt, iterations,
+                digest=sha256)
+
+        pbkdf2_encoded_password = b64encode(pbkdf2_encoded_password)
+
+        polyhash, sharenumber = self.hasher.update_hash_threshold(
+                pbkdf2_encoded_password)
+
+        password_string = "{}${}${}${}${}".format('pph', sharenumber,
+                iterations, salt, polyhash)
+
+        # TODO we should cehck whether they can provide partial verification
+        self.assertTrue(check(password, password_string))
+    
+
+
+    # we attempt to test a "migration" procedure using the hasher instance.To
+    # test this, we will create the hash both ways: from original data and
+    # through update_hash_thresholdless and compare the results
+    def test_update_hash_thresholdless(self):
+
+        # we will strip $ to avoid creating a threshold account by accident
+        salt = get_random_string(6).strip('$')
+
+        password = 'password1'
+        iterations = 12000
+
+        pbkdf2_encoded_password = pbkdf2(password, salt, iterations,
+                digest=sha256)
+
+        pbkdf2_encoded_password = b64encode(pbkdf2_encoded_password)
+
+        password_normally = make_password(password, salt, hasher='pph')
+        password_normally = password_normally.split('$',4)[4]
+
+        password_through_update = self.hasher.update_hash_thresholdless(
+                pbkdf2_encoded_password)
+       
+        self.assertTrue(constant_time_compare(password_normally,
+            password_through_update))
+
+        # finally, try to log in with our updated password
+        pass_string = "{}${}${}${}${}".format('pph', 0, iterations, salt,
+                password_through_update)
+    
+        # TODO we should cehck whether they can provide partial verification
+        self.assertTrue(check(password, pass_string))
+
+

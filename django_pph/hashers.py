@@ -24,10 +24,10 @@ except ImportError:
 
 from .shamirsecret import ShamirSecret
 from .settings import SETTINGS
-from .utils import (LockedException, b64enc, bin64enc, binary_type, get_cache,
-                    constant_time_compare, do_bytearray_xor)
+from .utils import (LockedException, b64enc, bin64enc, binary_type, cache,
+                    constant_time_compare, do_bytearray_xor, bin64dec)
 
-cache = get_cache('pph')
+# cache = get_cache(SETTINGS['CACHE_ALIAS'])
 logger = logging.getLogger('django.security.PPH')
 
 class PolyPasswordHasher(BasePasswordHasher):
@@ -116,6 +116,8 @@ class PolyPasswordHasher(BasePasswordHasher):
 
         assert algorithm == self.algorithm
         
+        iterations = int(iterations)
+
         # check if this is a non pph-protected hash, and just do normal 
         # verification for it.
         if sharenumber.startswith('-'):
@@ -397,6 +399,7 @@ class PolyPasswordHasher(BasePasswordHasher):
                             sharenumber, iterations, salt, passhash)
                     user.password = password
                 else:
+                    original_hash = original_hash.decode('ascii').strip()
                     passhash, sharenumber= update_hash_threshold(original_hash)
                     password = "{}${}${}${}${}".format(algorithm,
                             sharenumber, iterations, salt. passhash)
@@ -418,15 +421,16 @@ class PolyPasswordHasher(BasePasswordHasher):
                 sharenumber.strip('-')
             else:
                 # should decrypt
-                byte_hash = b64decode(original_hash)
+                byte_hash = b64decode(original_hash.encode('ascii').strip())
                 original_hash = AES.new(self.data['thresholdlesskey']).decrypt(
-                     buffer(byte_hash))
+                     bytes(byte_hash))
                 original_hash = b64enc(original_hash)
 
 
             sharenumber = int(sharenumber)
             assert sharenumber == 0
-
+            
+            original_hash = original_hash.encode('ascii').strip()
             passhash, sharenumber = self.update_hash_threshold(
                     original_hash)
             password = "%s$%d$%s$%s$%s" % (self.algorithm,
@@ -466,14 +470,15 @@ class PolyPasswordHasher(BasePasswordHasher):
             assert self.data['shamirsecretobj'] is not None
 
             partial_bytes = self.partialbytes
+            original_hash = original_hash.encode('ascii').strip()
             byte_hash = b64decode(
-                    original_hash[:len(original_hash) - partial_bytes])
+                    bytes(original_hash[:len(original_hash) - partial_bytes]))
             share = self.data['shamirsecretobj'].compute_share(
                     sharenumber)[1]
             byte_hash = do_bytearray_xor(share, byte_hash)
 
             passhash = AES.new(self.data['thresholdlesskey']).encrypt(
-                buffer(byte_hash))
+                    bytes(byte_hash))
             passhash = b64enc(passhash)
             passhash += b64enc(
                     byte_hash[len(byte_hash) - partial_bytes:])

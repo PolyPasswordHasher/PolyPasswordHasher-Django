@@ -1,4 +1,4 @@
-from base64 import b64encode
+from base64 import b64encode, b64decode
 
 from django.core.cache import get_cache
 from django.utils import six
@@ -40,4 +40,5 @@ def constant_time_compare(val1, val2):
 
 b64enc = lambda s: b64encode(s).decode('ascii').strip()
 bin64enc = lambda s: b64enc(binary_type(s))
+bin64dec = lambda s: binary_type(b64decode(s))
 cache = get_cache(SETTINGS['CACHE_ALIAS'])

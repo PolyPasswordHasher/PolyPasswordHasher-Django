@@ -167,6 +167,9 @@ class PolyPasswordHasherTestCase(TestCase):
 
         algorithm, sharenumber, iterations, salt, passhash = \
                 password1.split('$',4)
+        passhash = passhash.encode('ascii').strip()
+
+        iterations = int(iterations)
 
         self.assertTrue('pph' == algorithm)
         self.assertTrue(sharenumber.startswith('-'))
@@ -367,8 +370,17 @@ class PolyPasswordHasherTestCase(TestCase):
         # create a valid secret
         valid_secret = pph_init().create_secret() 
 
-        # invalid secret will have its first value inverted
-        invalid_secret = str(~ord(valid_secret[0])) + valid_secret[1:]
+        # invalid secret[0] will have its first bit inverted.
+        # TODO this looks ugly
+#        import pdb; pdb.set_trace()
+        if isinstance(valid_secret[0], int):
+            byte_to_negate = valid_secret[0]
+            byte_to_negate = byte_to_negate ^ 0x1
+            byte_to_negate = bytes(byte_to_negate)
+        else:
+            byte_to_negate = str(ord(valid_secret[0]) ^ 0x1)
+
+        invalid_secret = byte_to_negate + valid_secret[1:]
 
 
         # now lets verify both

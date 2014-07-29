@@ -56,35 +56,6 @@ class Migration(DataMigration):
         assert threshold_count >= threshold_total
 
     def backwards(self, orm):
-
-        polypasswordhasher = get_hasher('pph')
-
-        data = polypasswordhasher.data
-
-        if not data['is_unlocked'] or data['secret'] is None or data['thresholdlesskey'] is None:
-            print("context is locked, we will have to unlock it manually")
-            print("Please provide at least {} usernames and passwords".format(
-                polypasswordhasher.threshold))
-
-            username = password = 'Dummy'
-
-            while len(username) > 0:
-                username = _prompt('Provide a username: ')
-                password = _get_password('password: ')
-
-                user = orm.User.objects.filter(username=username)
-                if len(user) != 1:
-                    print("this user is not available")
-
-                user = user[0]
-                polypasswordhasher.verify(password, user.password)
-
-                
-            
-    
-        for user in orm.User.object.all():
-            print user.username
-
         "Write your backwards methods here."
 
     models = {
@@ -128,43 +99,5 @@ class Migration(DataMigration):
 
     complete_apps = ['auth']
     symmetrical = True
-
-
-def _prompt(message, result_type=str):
-  """
-    Non-public function that prompts the user for input by loging 'message',
-    converting the input to 'result_type', and returning the value to the
-    caller.
-  """
-
-  return result_type(six.moves.input(message))
-
-
-
-
-
-def _get_password(prompt='Password: ', confirm=False):
-  """
-    Non-public function that returns the password entered by the user.  If
-    'confirm' is True, the user is asked to enter the previously entered
-    password once again.  If they match, the password is returned to the caller.
-  """
-
-  while True:
-    # getpass() prompts the user for a password without echoing
-    # the user input.
-    password = getpass.getpass(prompt, sys.stderr)
-    
-    if not confirm:
-      return password
-    password2 = getpass.getpass('Confirm: ', sys.stderr)
-    
-    if password == password2:
-      return password
-    
-    else:
-      print('Mismatch; try again.')
-
-
 
 

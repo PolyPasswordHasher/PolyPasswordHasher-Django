@@ -329,8 +329,9 @@ class PolyPasswordHasher(BasePasswordHasher):
         shamirsecretdata = self.data['shamirsecretobj'].compute_share(
                 sharenumber)[1]
         passhash = do_bytearray_xor(byte_hash, shamirsecretdata)
-        passhash = b64enc(passhash)
-        passhash += b64enc(byte_hash[len(byte_hash) - self.partialbytes:])
+        passhash = b64enc(bytes(passhash))
+        passhash += b64enc(
+                bytes(byte_hash[len(byte_hash) - self.partialbytes:]))
         return passhash, sharenumber
  
     def _recombine(self):
@@ -355,7 +356,7 @@ class PolyPasswordHasher(BasePasswordHasher):
             raise Exception("Couldn't recombine store!")
 
         self.data['thresholdlesskey'] = self.data['secret']
-        self.data['is_unlocked']=1
+        self.data['is_unlocked'] = 1
 
         self._verify_previous_hashes()
         self._update_locked_hashes()
@@ -487,7 +488,7 @@ class PolyPasswordHasher(BasePasswordHasher):
                     bytes(byte_hash))
             passhash = b64enc(passhash)
             passhash += b64enc(
-                    byte_hash[len(byte_hash) - partial_bytes:])
+                    bytes(byte_hash[len(byte_hash) - partial_bytes:]))
 
             password = "%s$%d$%s$%s$%s" % (self.algorithm,
                     0, iterations, salt, passhash)

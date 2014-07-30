@@ -86,8 +86,8 @@ class PolyPasswordHasher(BasePasswordHasher):
                 self.data['secret'] is None:
             passhash = self.digest(password, salt, iterations)
             passhash = b64enc(passhash)
-            logger.debug("creating locked-account {}".format(passhash))
-            return "{}$-{}${}${}${}".format(self.algorithm, sharenumber,
+            logger.debug("creating locked-account {0}".format(passhash))
+            return "{0}$-{1}${2}${3}${4}".format(self.algorithm, sharenumber,
                     iterations, salt, passhash)
 
         # create_account(password, salt)
@@ -104,7 +104,7 @@ class PolyPasswordHasher(BasePasswordHasher):
         else:
             passhash = self._polyhash_entry(password, salt, sharenumber)
 
-        return "{}${}${}${}${}".format(self.algorithm, sharenumber,
+        return "{0}${1}${2}${3}${4}".format(self.algorithm, sharenumber,
                 iterations, salt, passhash)
 
     def verify(self, password, encoded):
@@ -123,7 +123,7 @@ class PolyPasswordHasher(BasePasswordHasher):
         if sharenumber.startswith('-'):
             passhash = self.digest(password, salt, iterations)
             passhash = b64enc(passhash)
-            logger.debug("verifying a locked account {}".format(passhash))
+            logger.debug("verifying a locked account {0}".format(passhash))
             return constant_time_compare(passhash, original_hash)
 
         
@@ -148,7 +148,7 @@ class PolyPasswordHasher(BasePasswordHasher):
             if partial_result and not result:
                 logger.error("Failed login with correct partial bytes. " + 
                             "Possible database leak detected! The offending " +
-                            "Hash is: {}".format(original_hash))
+                            "Hash is: {0}".format(original_hash))
             
             return constant_time_compare(original_hash, proposed_hash)
 
@@ -168,8 +168,8 @@ class PolyPasswordHasher(BasePasswordHasher):
                     new_share = b64enc(share)
                     # if they are not the same
                     if not constant_time_compare(original_share, new_share):
-                        raise Exception("Cached share does not match the new "
-                                        " share value!")
+                        logger.error("Cached share does not match the new "
+                                    "share value! possible break-in deteced")
                 else:
                     # this is a new share, add it to the cache and recombine if
                     # possible
@@ -190,6 +190,12 @@ class PolyPasswordHasher(BasePasswordHasher):
             if self.partialbytes > 0:
                 result = self._partial_verify(password, salt, original_hash,
                         iterations, sharenumber)
+
+                # remove the last share we added if we don't have a partial
+                # match
+                if not result and sharenumber != 0:
+                    cache.delete(sharenumber)
+
                 return result
 
         raise LockedException
@@ -377,7 +383,7 @@ class PolyPasswordHasher(BasePasswordHasher):
                 if not constant_time_compare(passhash, original_hash[:hashlen]):
                         logger.error("original hash mismatches partial " +
                         "verification! Possible break-in detected! The " +
-                        "offending hash is {}".format(original_hash[:hashlen]))
+                        "offending hash is {0}".format(original_hash[:hashlen]))
 
     def _update_locked_hashes(self):
         all_users = User.objects.filter(
@@ -395,13 +401,13 @@ class PolyPasswordHasher(BasePasswordHasher):
                 sharenumber = int(sharenumber)
                 if sharenumber == 0:
                     passhash = self.update_hash_thresholdless(original_hash)
-                    password = "{}${}${}${}${}".format(algorithm,
+                    password = "{0}${1}${2}${3}${4}".format(algorithm,
                             sharenumber, iterations, salt, passhash)
                     user.password = password
                 else:
                     original_hash = original_hash.decode('ascii').strip()
                     passhash, sharenumber= update_hash_threshold(original_hash)
-                    password = "{}${}${}${}${}".format(algorithm,
+                    password = "{0}${1}${2}${3}${4}".format(algorithm,
                             sharenumber, iterations, salt. passhash)
                     user.password = password
 
@@ -488,7 +494,7 @@ class PolyPasswordHasher(BasePasswordHasher):
 
         else:
 
-            password = "{}$-0${}${}${}".format(self.algorithm, iterations,
+            password = "{0}$-0${1}${2}${3}".format(self.algorithm, iterations,
                     salt, original_hash)
 
 

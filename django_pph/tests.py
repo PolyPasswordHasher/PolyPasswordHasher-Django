@@ -321,7 +321,7 @@ class PolyPasswordHasherTestCase(TestCase):
         polyhash, sharenumber = self.hasher.update_hash_threshold(
                 pbkdf2_encoded_password)
 
-        password_string = "{}${}${}${}${}".format('pph', sharenumber,
+        password_string = "{0}${1}${2}${3}${4}".format('pph', sharenumber,
                 iterations, salt, polyhash)
 
         # TODO we should cehck whether they can provide partial verification
@@ -355,7 +355,7 @@ class PolyPasswordHasherTestCase(TestCase):
             password_through_update))
 
         # finally, try to log in with our updated password
-        pass_string = "{}${}${}${}${}".format('pph', 0, iterations, salt,
+        pass_string = "{0}${1}${2}${3}${4}".format('pph', 0, iterations, salt,
                 password_through_update)
     
         # TODO we should cehck whether they can provide partial verification

@@ -341,28 +341,50 @@ class PolyPasswordHasher(BasePasswordHasher):
         sharenumbers = cache.get("sharenumbers")
         assert sharenumbers is not None
 
-        recombination_shares = []
-        for share in sharenumbers:
-            share_value = cache.get(share)
-            assert share_value is not None
-            current_share = (int(share), share_value)
-            recombination_shares.append(current_share)
+        # should itertools.combination(sharenumbers, threhsold)
+        possible_recombinations = itertools.combination(sharenumbers, 
+                self.threshold)
 
-        self.data['shamirsecretobj'] = ShamirSecret(self.threshold)
-        self.data['shamirsecretobj'].recover_secretdata(recombination_shares)
-        self.data['secret'] = self.data['shamirsecretobj'].secretdata
+        for recombination_set in possible_recombinations:
+    
+            # prepare a recombination set with one of the combinatory sets
+            recombination_attempt_shares = []
+            for share in recombination_set:
 
-        if not self.verify_secret(self.data['secret']):
-            raise Exception("Couldn't recombine store!")
+                share_value = cache.get(share)
+                assert share_value is not None
+                current_share = (int(share), share_value)
+                recombination_attempt_shares.append(current_share)
 
-        self.data['thresholdlesskey'] = self.data['secret']
-        self.data['is_unlocked'] = 1
+            self.data['shamirsecretobj'] = ShamirSecret(self.threshold)
+           
+            try:
+                self.data['shamirsecretobj'].recover_secretdata(
+                        recombination_attempt_shares)
 
-        self._verify_previous_hashes()
-        self._update_locked_hashes()
+                if not self.verify_secret(self.data['secret']):
+                    raise Exception("Couldn't recombine store!")
 
-        self.data['last_unlocked'] = datetime.datetime.utcnow()
-        self.update()
+            except Exception as e:
+                
+                logger.error(
+                    "one or more shares of this set: {0} are invalid".format(
+                        recombination_attempt_shares) + 
+                    "Possible break in detected!")
+                self.data['shamirsecretobj'] = None
+                continue
+    
+            self.data['secret'] = self.data['shamirsecretobj'].secretdata
+            self.data['thresholdlesskey'] = self.data['secret']
+            self.data['is_unlocked'] = 1
+
+            self._verify_previous_hashes()
+            self._update_locked_hashes()
+
+            self.data['last_unlocked'] = datetime.datetime.utcnow()
+            self.update()
+
+
 
     def _verify_previous_hashes(self):
         partially_verified_hashes = cache.get('partial_hashes')

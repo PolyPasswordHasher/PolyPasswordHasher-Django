@@ -21,9 +21,11 @@ class Command(BaseCommand):
         """
         Locks a the store for the hasher.
         """
-        self.hasher.update(
-                shamirsecretobj = None,
-                thresholdlesskey = None,
-                secret = None,
-                is_unlocked = False,
-        )
+        data = {
+            'is_unlocked': False,
+            'secret': None,
+            'shamirsecretobj': None,
+            'thresholdlesskey': None,
+        }
+        self.hasher.update(data)
+        cache.set('hasher', data)

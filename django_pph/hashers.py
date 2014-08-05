@@ -10,6 +10,7 @@ from django.contrib.auth.models import User
 import hashlib
 import logging
 import datetime
+import itertools
 
 try:
     from collections import OrderedDict
@@ -342,7 +343,7 @@ class PolyPasswordHasher(BasePasswordHasher):
         assert sharenumbers is not None
 
         # should itertools.combination(sharenumbers, threhsold)
-        possible_recombinations = itertools.combination(sharenumbers, 
+        possible_recombinations = itertools.combinations(sharenumbers, 
                 self.threshold)
 
         for recombination_set in possible_recombinations:
@@ -362,19 +363,19 @@ class PolyPasswordHasher(BasePasswordHasher):
                 self.data['shamirsecretobj'].recover_secretdata(
                         recombination_attempt_shares)
 
+                self.data['secret'] = self.data['shamirsecretobj'].secretdata
+
                 if not self.verify_secret(self.data['secret']):
                     raise Exception("Couldn't recombine store!")
 
             except Exception as e:
-                
                 logger.error(
-                    "one or more shares of this set: {0} are invalid".format(
-                        recombination_attempt_shares) + 
+                    "one or more shares of this set: {0} are invalid! ".format(
+                        [x[0] for x in recombination_attempt_shares]) + 
                     "Possible break in detected!")
                 self.data['shamirsecretobj'] = None
                 continue
     
-            self.data['secret'] = self.data['shamirsecretobj'].secretdata
             self.data['thresholdlesskey'] = self.data['secret']
             self.data['is_unlocked'] = 1
 
@@ -382,6 +383,8 @@ class PolyPasswordHasher(BasePasswordHasher):
             self._update_locked_hashes()
 
             self.data['last_unlocked'] = datetime.datetime.utcnow()
+            logger.info("Store was successfully unlocked (shares {0})".format(
+                [x[0] for x in recombination_attempt_shares]))
             self.update()
 
 

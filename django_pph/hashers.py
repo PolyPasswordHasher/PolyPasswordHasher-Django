@@ -46,6 +46,8 @@ class PolyPasswordHasher(BasePasswordHasher):
         'shamirsecretobj': None,
         'thresholdlesskey': None,
         'last_unlocked' : datetime.datetime.utcnow(),
+        'first_authentication' = None
+        'number_of_verifications':0
     }
     defaults = data.copy()
 
@@ -196,6 +198,15 @@ class PolyPasswordHasher(BasePasswordHasher):
                 # match
                 if not result and sharenumber != 0:
                     cache.delete(sharenumber)
+
+                # increment the number of verifications while we are unlocked
+                self.data['number_of_verifications'] += 1
+                self.update()
+
+                # is this the first authentication?
+                if self.data['first_authentication'] is None and result:
+                    self.data['first_authentication'] = \
+                            datetime.datetime.utcnow()
 
                 return result
 

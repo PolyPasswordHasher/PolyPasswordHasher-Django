@@ -21,6 +21,7 @@ class Command(BaseCommand):
         """
         Locks a the store for the hasher.
         """
+        self.hasher.load()
         data = {
             'is_unlocked': False,
             'secret': None,

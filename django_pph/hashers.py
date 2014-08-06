@@ -46,8 +46,8 @@ class PolyPasswordHasher(BasePasswordHasher):
         'shamirsecretobj': None,
         'thresholdlesskey': None,
         'last_unlocked' : datetime.datetime.utcnow(),
-        'first_authentication' = None
-        'number_of_verifications':0
+        'first_authentication' : None,
+        'number_of_verifications' : 0
     }
     defaults = data.copy()
 

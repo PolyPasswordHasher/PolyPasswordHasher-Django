@@ -377,7 +377,7 @@ class PolyPasswordHasher(BasePasswordHasher):
                 continue
     
             self.data['thresholdlesskey'] = self.data['secret']
-            self.data['is_unlocked'] = 1
+            self.data['is_unlocked'] = True
 
             self._verify_previous_hashes()
             self._update_locked_hashes()
@@ -415,7 +415,7 @@ class PolyPasswordHasher(BasePasswordHasher):
         all_users = User.objects.filter(
                 date_joined__gte=self.data['last_unlocked'])
 
-        assert self.data['is_unlocked'] == 1
+        assert self.data['is_unlocked'] == True
         assert self.data['thresholdlesskey'] is not None
         assert self.data['secret'] is not None
 
@@ -447,7 +447,7 @@ class PolyPasswordHasher(BasePasswordHasher):
                 passhash.split('$', 4)
         assert algorithm == 'pph'
 
-        if self.data['is_unlocked'] == 1:
+        if self.data['is_unlocked']:
 
             if sharenumber.startswith('-'):
                 sharenumber.strip('-')

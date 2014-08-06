@@ -41,9 +41,10 @@ class PolyPasswordHasherTestCase(TestCase):
     hasher.load()
     hasherbackup = deepcopy(hasher.data)
 
-    def test_hasher(self):
-
+    def setUp(self):
         reset_hasher_state(self.hasher, self.hasherbackup)
+
+    def test_hasher(self):
 
         password1 = make_share('password1')
         password2 = make_share('password2')
@@ -74,7 +75,6 @@ class PolyPasswordHasherTestCase(TestCase):
     # We create a brand new store, lock it and unlock it. We expect to have
     # the secret back at the end of this function.
     def test_unlock_store(self):
-        reset_hasher_state(self.hasher, self.hasherbackup)
         
         password1 = make_share('password1')
         password2 = make_share('password2')
@@ -104,9 +104,6 @@ class PolyPasswordHasherTestCase(TestCase):
     #   * Provide verification capabilities after unlocking (original hash)
     def test_thresholdless_hash(self):
 
-        # Ensure we have an unlocked context to begin with
-        reset_hasher_state(self.hasher, self.hasherbackup)
-        
         # These are threshold accounts for the unlocking phase
         password1 = make_share('password1')
         password2 = make_share('password2')
@@ -145,8 +142,6 @@ class PolyPasswordHasherTestCase(TestCase):
 
     def test_partial_verfication(self):
 
-        reset_hasher_state(self.hasher, self.hasherbackup)
-
         password1 = make_share('password1')
 
         # Forcefully lock the context
@@ -160,7 +155,6 @@ class PolyPasswordHasherTestCase(TestCase):
 
         # Forcefully lock the context and flush everything related to
         # accounts
-        reset_hasher_state(self.hasher, self.hasherbackup)
         self.hasher.update(secret=None, thresholdlesskey=None,
                 is_unlocked=False)
         cache.clear()
@@ -187,8 +181,6 @@ class PolyPasswordHasherTestCase(TestCase):
     # fail to promote already threshold accounts
     def test_promote_hash(self):
 
-        # Ensure we have an unlocked context to begin with
-        reset_hasher_state(self.hasher, self.hasherbackup)
         
         password1 = make('password1')
         promoted_password1 = self.hasher.promote_hash(password1)
@@ -238,9 +230,6 @@ class PolyPasswordHasherTestCase(TestCase):
     # into a thresholdless password.
     def test_demote_user(self):
 
-        # Ensure we have an unlocked context to begin with
-        reset_hasher_state(self.hasher, self.hasherbackup)
-        
         password1 = make_share('password1')
         demoted_password1 = self.hasher.demote_hash(password1)
 
@@ -293,8 +282,6 @@ class PolyPasswordHasherTestCase(TestCase):
     # data and one by updatng our resulting hash.
     def test_update_hash_threshold(self): 
   
-        reset_hasher_state(self.hasher, self.hasherbackup)
-
         # we will remove the $ because we are going to create the entry
         # artificially
         salt = get_random_string(6).strip('$')
@@ -324,7 +311,6 @@ class PolyPasswordHasherTestCase(TestCase):
     def test_update_hash_thresholdless(self):
 
         # we will strip $ to avoid creating a threshold account by accident
-        reset_hasher_state(self.hasher, self.hasherbackup)
         salt = get_random_string(6).strip('$')
 
         password = 'password1'
@@ -382,9 +368,6 @@ class PolyPasswordHasherTestCase(TestCase):
     # by logging in threshold + 1 accounts
     def test_recombination_with_wrong_shares(self):
 
-        # Ensure we have an unlocked context to begin with
-        reset_hasher_state(self.hasher, self.hasherbackup)
-        
         # this is a threshold-sensitive test, so we will ensure it's the value
         # we need
         self.assertTrue(self.hasher.threshold == 3)

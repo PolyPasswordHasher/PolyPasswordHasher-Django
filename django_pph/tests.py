@@ -375,3 +375,50 @@ class PolyPasswordHasherTestCase(TestCase):
         # now lets verify both
         self.assertTrue(self.hasher.verify_secret(valid_secret))
         self.assertTrue(not self.hasher.verify_secret(invalid_secret))
+
+    # We will attempt to create a threshold number of threshold accounts. After
+    # this, we will attempt recombination with one of the log-ins being a 
+    # partial_verification colission. After this, we will attempt recombination
+    # by logging in threshold + 1 accounts
+    def test_recombination_with_wrong_shares(self):
+
+        # Ensure we have an unlocked context to begin with
+        reset_hasher_state(self.hasher, self.hasherbackup)
+        
+        # this is a threshold-sensitive test, so we will ensure it's the value
+        # we need
+        self.assertTrue(self.hasher.threshold == 3)
+
+        # create conflicting hash
+        # Consider that these credentials only work for pbkdf2_sha256 and 
+        # 12000 iterations
+        PASSWORD = 'santiago'
+        COLISSION_PASSWORD = 'jojo'
+        SALT = '4IPwS2gg0Oo1'
+        password_with_colission = make_password('santiago', '$4IPwS2gg0Oo1', 
+                hasher='pph')
+
+        # make a threshold number of accounts for unlocking
+        password1 = make_share('password1')
+        password2 = make_share('password2')
+        password3 = make_share('password3')
+
+        # lock the context now.
+        self.hasher.update(
+                secret = None,
+                thresholdlesskey = None,
+                is_unlocked = None)
+
+        # try to recover the secret, use the colission share to make a conflict
+        self.assertTrue(check(COLISSION_PASSWORD, password_with_colission))
+
+        self.assertTrue(check('password1', password1))
+        self.assertTrue(check('password2', password2))
+
+        # should be unlocked, if the first password was correct
+        self.assertTrue(not self.hasher.data['is_unlocked'])
+
+        # should be able to unlock with one more login
+        self.assertTrue(check('password3', password3))
+        self.assertTrue(self.hasher.data['is_unlocked'])
+

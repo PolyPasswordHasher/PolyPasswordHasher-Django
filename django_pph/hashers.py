@@ -396,12 +396,12 @@ class PolyPasswordHasher(BasePasswordHasher):
             return
 
         for original_hash in partially_verified_hashes:
-            sharenumber, saltedhash = partially_verified_hashes[original_hash]
+            sharenumber, byte_hash = partially_verified_hashes[original_hash]
 
             # We only verify thresholdless accounts because threshold accounts
             # would fail in the recombination phase. 
             if sharenumber == 0:
-                byte_hash = b64decode(saltedhash)
+
                 passhash = AES.new(
                         self.data['thresholdlesskey']).encrypt(byte_hash)
                 passhash = b64enc(passhash)

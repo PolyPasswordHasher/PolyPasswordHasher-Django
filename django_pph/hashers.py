@@ -312,7 +312,7 @@ class PolyPasswordHasher(BasePasswordHasher):
         secret_length = SETTINGS['SECRET_LENGTH']
         verification_len = SETTINGS['SECRET_VERIFICATION_BYTES']
         random_data = secret[:secret_length - verification_len]
-        secret_hash = self.digest(random_data, None, 1)
+        secret_hash = self.digest(random_data, '', 1)
         secret_hash_text = b64enc(secret_hash)[:verification_len]
         return constant_time_compare(secret[secret_length - verification_len:],
                                      secret_hash_text)

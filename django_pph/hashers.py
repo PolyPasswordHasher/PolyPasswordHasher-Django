@@ -26,7 +26,7 @@ except ImportError:
 from .shamirsecret import ShamirSecret
 from .settings import SETTINGS
 from .utils import (LockedException, b64enc, bin64enc, binary_type, cache,
-                    constant_time_compare, do_bytearray_xor, bin64dec)
+                    constant_time_compare, do_bytearray_xor, bin64dec, share_cache)
 
 # cache = get_cache(SETTINGS['CACHE_ALIAS'])
 logger = logging.getLogger('django.security.PPH')
@@ -42,14 +42,18 @@ class PolyPasswordHasher(BasePasswordHasher):
     data = {
         'is_unlocked': False,
         'secret': None,
-        'nextavailableshare': 1,
         'shamirsecretobj': None,
         'thresholdlesskey': None,
         'last_unlocked' : datetime.datetime.utcnow(),
         'first_authentication' : None,
         'number_of_verifications' : 0
     }
+    share_data = {
+        'nextavailableshare': 1,
+        'free_shares': []
+    }
     defaults = data.copy()
+    share_defaults = share_data.copy()
 
     def digest(self, password, salt, iterations):
         return pbkdf2(password, salt, iterations, digest=hashlib.sha256)
@@ -57,9 +61,11 @@ class PolyPasswordHasher(BasePasswordHasher):
     def update(self, **attrs):
         self.data.update(attrs)
         cache.set('hasher', self.data)
+        share_cache.set('share_data', self.share_data)
 
     def load(self):
         self.data = cache.get('hasher') or self.defaults
+        self.share_data = share_cache.get('share_data') or self.share_defaults
 
     def encode(self, password, salt, iterations=None):
         if not self.data['is_unlocked']:
@@ -72,8 +78,8 @@ class PolyPasswordHasher(BasePasswordHasher):
         # we pre-parse the input string to verify which kind of entry this
         # belongs to
         if '$' in salt:
-            sharenumber = self.data['nextavailableshare']
-            self.data['nextavailableshare'] += 1
+            sharenumber = self.share_data['nextavailableshare']
+            self.share_data['nextavailableshare'] += 1
             self.update()
             salt = salt.strip('$')
         else:
@@ -334,8 +340,8 @@ class PolyPasswordHasher(BasePasswordHasher):
 
         byte_hash = b64decode(hash)
 
-        sharenumber = self.data['nextavailableshare']
-        self.data['nextavailableshare'] += 1
+        sharenumber = self.share_data['nextavailableshare']
+        self.share_data['nextavailableshare'] += 1
         self.update()
 
         shamirsecretdata = self.data['shamirsecretobj'].compute_share(
@@ -489,8 +495,8 @@ class PolyPasswordHasher(BasePasswordHasher):
             sharenumber = int(sharenumber)
             assert sharenumber == 0
 
-            new_sharenumber = int(self.data['nextavailableshare'])
-            self.data['nextavailableshare'] += 1
+            new_sharenumber = int(self.share_data['nextavailableshare'])
+            self.share_data['nextavailableshare'] += 1
             self.update()
             password = "%s$-%d$%s$%s$%s" % (self.algorithm,
                     new_sharenumber, iterations, salt, original_hash)

@@ -26,11 +26,12 @@ def check(password, encoded):
 
 def reset_hasher_state(hasher, backup):
     cache.clear()
-    hasher.update(nextavailableshare = backup['nextavailableshare'],
-            secret = backup['secret'],
-            thresholdlesskey = backup['thresholdlesskey'],
-            shamirsecretobj = backup['shamirsecretobj'],
-            is_unlocked = backup['shamirsecretobj'])
+    hasher.data['secret'] = backup['secret']
+    hasher.data['thresholdlesskey'] = backup['thresholdlesskey']
+    hasher.data['shamirsecretobj'] = backup['shamirsecretobj']
+    hasher.data['is_unlocked'] = backup['is_unlocked']
+    hasher.share_data['nextavailableshare'] = 1
+    hasher.update()
     
 
 class PolyPasswordHasherTestCase(TestCase):
@@ -49,7 +50,7 @@ class PolyPasswordHasherTestCase(TestCase):
         password1 = make_share('password1')
         password2 = make_share('password2')
         password3 = make_share('password3')
-
+        
         self.assertTrue(password1.startswith('pph$1'))
         self.assertTrue(password2.startswith('pph$2'))
         self.assertTrue(password3.startswith('pph$3'))

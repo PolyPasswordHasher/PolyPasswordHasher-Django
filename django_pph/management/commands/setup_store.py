@@ -7,13 +7,14 @@ from django.core.management import call_command
 from django_pph.shamirsecret import ShamirSecret
 from django_pph.settings import SETTINGS
 from django_pph.utils import cache, bin64enc, binary_type
-from django_pph.management.commands import initialize_pph_context, promote_user
 
 
 class Command(BaseCommand):
 
     help = 'Initializes the polypasswordhasher store with a new secret and ' +\
-        'updates the database'
+        'updates the database.\n\n' +\
+        "This command requires a list of trusted users to be initialized " +\
+        "as threshold accounts"
 
     hasher = get_hasher('pph')
 
@@ -25,8 +26,9 @@ class Command(BaseCommand):
 
         threshold = self.hasher.threshold
        
-        assert len(args) >= threshold, "Not enough user to create a store " + \
-        "with the current settings."
+        assert len(args) >= threshold, "Not enough users provided to " +\
+            "create a store with the current settings.\n\t" +\
+            "Usage: ./manage.py setup_store [user1] [user2] ... [usern]"
 
         users = []
         for username in args:
@@ -44,7 +46,7 @@ class Command(BaseCommand):
             algorithm, iterations, salt, passhash = user.password.split('$')
 
             assert algorithm == 'pbkdf2_sha256', \
-                    "Cannot update hash for user {0}, hasher ({1}) not supported.".format(
+                "Cannot update hash for user {0}, hasher ({1}) not supported.".format(
                             user.username, algorithm)
 
 
@@ -74,7 +76,8 @@ class Command(BaseCommand):
                 continue
 
             if not user.password.startswith('pbkdf2_sha256'):
-                print("Unsupported hashing format for username {0}, skipping.".format(user.username))
+                print("Unsupported hashing format for username {0}, skipping.".format(
+                    user.username))
                 continue
 
             algorithm, iterations, salt, passhash = user.password.split("$")
@@ -87,6 +90,7 @@ class Command(BaseCommand):
             user.password = new_password
             user.save()
 
+        print("Database initialized")
 
 
     

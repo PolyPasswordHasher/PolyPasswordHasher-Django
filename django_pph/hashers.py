@@ -31,6 +31,9 @@ from .utils import (LockedException, b64enc, bin64enc, binary_type, cache,
 # cache = get_cache(SETTINGS['CACHE_ALIAS'])
 logger = logging.getLogger('django.security.PPH')
 
+# This logger logs information about the number of logins, account creations, etc.
+instrumentation_logger = logging.getLogger('django.PPH_instrumentation')
+
 class PolyPasswordHasher(BasePasswordHasher):
     algorithm = 'pph'
     iterations = 12000
@@ -64,8 +67,12 @@ class PolyPasswordHasher(BasePasswordHasher):
         share_cache.set('share_data', self.share_data)
 
     def load(self):
+
         self.data = cache.get('hasher') or self.defaults
         self.share_data = share_cache.get('share_data') or self.share_defaults
+
+        instrumentation_logger.info(
+                "Hasher loaded: status: {0}".format(self.data['is_unlocked']))
 
     def encode(self, password, salt, iterations=None):
         if not self.data['is_unlocked']:
@@ -95,7 +102,12 @@ class PolyPasswordHasher(BasePasswordHasher):
                 self.data['secret'] is None:
             passhash = self.digest(password, salt, iterations)
             passhash = b64enc(passhash)
+
+            instrumentation_logger.info("Account created: status: {0} type: {1}".format(
+                "unlocked" if self.data['is_unlocked'] else "locked", sharenumber))
+
             logger.debug("creating locked-account {0}".format(passhash))
+
             return "{0}$-{1}${2}${3}${4}".format(self.algorithm, sharenumber,
                     iterations, salt, passhash)
 
@@ -112,6 +124,9 @@ class PolyPasswordHasher(BasePasswordHasher):
             passhash = self._encrypt_entry(password, salt)
         else:
             passhash = self._polyhash_entry(password, salt, sharenumber)
+
+        instrumentation_logger.info("Account created: status: {0} type: {1}".format(
+            "unlocked" if self.data['is_unlocked'] else "locked", sharenumber))
 
         return "{0}${1}${2}${3}${4}".format(self.algorithm, sharenumber,
                 iterations, salt, passhash)
@@ -132,6 +147,13 @@ class PolyPasswordHasher(BasePasswordHasher):
         if sharenumber.startswith('-'):
             passhash = self.digest(password, salt, iterations)
             passhash = b64enc(passhash)
+
+            login_result = constant_time_compare(passhash, original_hash)
+
+            instrumentation_logger.info(
+                    "Verifying locked account: status: {0} result: {1}".format(
+                self.data['is_unlocked'], login_result))
+
             logger.debug("verifying a locked account {0}".format(passhash))
             return constant_time_compare(passhash, original_hash)
 
@@ -154,12 +176,16 @@ class PolyPasswordHasher(BasePasswordHasher):
                 iterations, sharenumber)
             result = constant_time_compare(original_hash, proposed_hash)
             
+            instrumentation_logger.info(
+                    "Verifying account: status: {0} result: {1} pb: {2}".
+                    format(self.data['is_unlocked'], result, partial_result))
+
             if partial_result and not result:
                 logger.error("Failed login with correct partial bytes. " + 
                             "Possible database leak detected! The offending " +
                             "Hash is: {0}".format(original_hash))
             
-            return constant_time_compare(original_hash, proposed_hash)
+            return result
 
         else:
             # try to infer the share from the information given
@@ -192,6 +218,9 @@ class PolyPasswordHasher(BasePasswordHasher):
                     cache.set("sharenumbers", sharenumbers)
 
                     if len(sharenumbers) >= self.threshold:
+                        instrumentation_logger.info(
+                                "Attempting recombination: Shares collected {0}".
+                                format(len(sharenumbers)))
                         self._recombine()
 
             # partial verification step, if we are locked, let's try to log the
@@ -213,6 +242,9 @@ class PolyPasswordHasher(BasePasswordHasher):
                 if self.data['first_authentication'] is None and result:
                     self.data['first_authentication'] = \
                             datetime.datetime.utcnow()
+
+                instrumentation_logger.info("Verifying account: status: {0} result: {1}".format(
+                    self.data['is_unlocked'], result))
 
                 return result
 
@@ -400,6 +432,11 @@ class PolyPasswordHasher(BasePasswordHasher):
             self._update_locked_hashes()
 
             self.data['last_unlocked'] = datetime.datetime.utcnow()
+
+            instrumentation_logger.info(
+                    "Recombination successful (shares {0})".format(
+                        [x[0] for x in recombination_attempt_shares]))
+                    
             logger.info("Store was successfully unlocked (shares {0})".format(
                 [x[0] for x in recombination_attempt_shares]))
             self.update()

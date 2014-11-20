@@ -34,7 +34,15 @@ class Command(BaseCommand):
         """
         secret_length = SETTINGS['SECRET_LENGTH']
         verification_len = SETTINGS['SECRET_VERIFICATION_BYTES']
+        verification_iterations = SETTINGS['SECRET_ITERATIONS']
+        
         secret = get_random_string(secret_length - verification_len)
-        secret_digest = bin64enc(self.hasher.digest(secret, '', 1))
+
+        secret_digest = self.hasher.digest(secret, '', 1)
+        for i in range(1, verification_iterations):
+            secret_digest = self.hasher.digest(secret_digest, '', 1)
+        secret_digest = bin64enc(secret_digest)
+
+        
         secret += secret_digest[:SETTINGS['SECRET_VERIFICATION_BYTES']]
         return binary_type(secret)

@@ -343,9 +343,15 @@ class PolyPasswordHasher(BasePasswordHasher):
         secret = binary_type(secret)
         secret_length = SETTINGS['SECRET_LENGTH']
         verification_len = SETTINGS['SECRET_VERIFICATION_BYTES']
+        verification_iterations = SETTINGS['SECRET_ITERATIONS']
+
         random_data = secret[:secret_length - verification_len]
-        secret_hash = self.digest(random_data, '', 1)
-        secret_hash_text = b64enc(secret_hash)[:verification_len]
+
+        secret_digest = self.digest(random_data, '', 1)
+        for i in range(1, verification_iterations):
+            secret_digest = self.digest(secret_digest, '', 1)
+        secret_hash_text = b64enc(secret_digest)[:verification_len]
+
         return constant_time_compare(secret[secret_length - verification_len:],
                                      secret_hash_text)
 

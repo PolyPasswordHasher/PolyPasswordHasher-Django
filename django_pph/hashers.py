@@ -120,10 +120,15 @@ class PolyPasswordHasher(BasePasswordHasher):
 
         # we verify whether the entry is to be a threshold or thresholdless
         # account.
+        saltedpasswordhash = self.digest(password, salt, iterations)
         if sharenumber == 0 or sharenumber is None:
-            passhash = self._encrypt_entry(password, salt)
+            passhash = self._encrypt_entry(saltedpasswordhash)
         else:
-            passhash = self._polyhash_entry(password, salt, sharenumber)
+            passhash = self._polyhash_entry(saltedpasswordhash, sharenumber)
+
+        partial_bytes = self.digest(password, salt, SETTINGS['PARTIAL_BYTES_ITERATIONS'])
+        passhash += b64enc(partial_bytes[len(partial_bytes) -
+            self.partialbytes:])
 
         instrumentation_logger.info("Account created: status: {0} type: {1}".format(
             "unlocked" if self.data['is_unlocked'] else "locked", sharenumber))
@@ -163,18 +168,20 @@ class PolyPasswordHasher(BasePasswordHasher):
         if self.data['secret'] is not None and \
                 self.data['thresholdlesskey'] is not None:
 
+            saltedpasswordhash = self.digest(password, salt, iterations)
             if sharenumber != 0:
-                proposed_hash = self._polyhash_entry(password, salt,
+                proposed_hash = self._polyhash_entry(saltedpasswordhash,
                         sharenumber)
+                result = constant_time_compare(original_hash[:len(proposed_hash)], proposed_hash)
 
             else:
-                proposed_hash = self._encrypt_entry(password, salt)
+                proposed_hash = self._encrypt_entry(saltedpasswordhash)
+                result = constant_time_compare(original_hash[:len(proposed_hash)], proposed_hash)
 
             # We will also check the partial verification to notify of possible
             # break-in attempts
             partial_result = self._partial_verify(password, salt, original_hash,
                 iterations, sharenumber)
-            result = constant_time_compare(original_hash, proposed_hash)
             
             instrumentation_logger.info(
                     "Verifying account: status: {0} result: {1} pb: {2}".
@@ -265,39 +272,36 @@ class PolyPasswordHasher(BasePasswordHasher):
         algorithm, sharenumber, iterations, salt, hash = encoded.split('$', 4)
         return int(iterations) != self.iterations
 
-    def _polyhash_entry(self, password, salt, sharenumber):
+    def _polyhash_entry(self, saltedpasswordhash, sharenumber):
         """
         private helper that computes a polyhashed entry with a given
         sharenumber, password and salt. Used in hash creation and verification.
         """
         assert self.data['shamirsecretobj'] is not None
 
-        saltedpasswordhash = self.digest(password, salt, self.iterations)
+        # saltedpasswordhash = self.digest(password, salt, self.iterations)
         shamirsecretdata = self.data['shamirsecretobj'].compute_share(
                 sharenumber)[1]
         passhash = do_bytearray_xor(saltedpasswordhash, shamirsecretdata)
         passhash = bin64enc(passhash)
-        passhash += b64enc(saltedpasswordhash[len(saltedpasswordhash)
-                                              - self.partialbytes:])
+
         return passhash
 
-    def _encrypt_entry(self, password, salt):
+    def _encrypt_entry(self, saltedpasswordhash):
 
         assert self.data['thresholdlesskey'] is not None
         assert self.data['secret'] is not None
 
-        saltedpasswordhash = self.digest(password, salt, self.iterations)
         passhash = AES.new(self.data['thresholdlesskey']).encrypt(
                 saltedpasswordhash)
         passhash = bin64enc(passhash)
-        passhash += b64enc(saltedpasswordhash[len(saltedpasswordhash)
-                                              - self.partialbytes:])
+
         return passhash
 
     def _partial_verify(self, password, salt, passhash, iterations, 
             sharenumber):
 
-        saltedpasswordhash = self.digest(password , salt, iterations)
+        saltedpasswordhash = self.digest(password , salt, SETTINGS['PARTIAL_BYTES_ITERATIONS'])
         partial_bytes = b64enc(saltedpasswordhash[len(saltedpasswordhash)
                                            - self.partialbytes:])
 
@@ -336,6 +340,9 @@ class PolyPasswordHasher(BasePasswordHasher):
         proper fingerprint with the following form:
 
         [28 bytes random data][4 bytes hash of random data]
+
+        The length of both fields is configurable through the settings.py
+        file
 
         the boolean returned indicates whether it falls under the
         fingerprint or not

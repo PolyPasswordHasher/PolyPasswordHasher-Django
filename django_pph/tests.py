@@ -24,6 +24,15 @@ def make_share(password):
 def check(password, encoded):
     return check_password(password, encoded,  preferred='pph')
 
+def reset_hasher_state(hasher, backup):
+    cache.clear()
+    hasher.data['secret'] = backup['secret']
+    hasher.data['thresholdlesskey'] = backup['thresholdlesskey']
+    hasher.data['shamirsecretobj'] = backup['shamirsecretobj']
+    hasher.data['is_unlocked'] = backup['is_unlocked']
+    hasher.share_data['nextavailableshare'] = 1
+    hasher.update()
+    
 
 class PolyPasswordHasherTestCase(TestCase):
     hasher = get_hasher('pph')
@@ -33,20 +42,15 @@ class PolyPasswordHasherTestCase(TestCase):
     hasher.load()
     hasherbackup = deepcopy(hasher.data)
 
-    def test_hasher(self):
+    def setUp(self):
+        reset_hasher_state(self.hasher, self.hasherbackup)
 
-        cache.clear()
-        self.hasher.update(nextavailableshare = \
-                        self.hasherbackup['nextavailableshare'],
-                        secret = self.hasherbackup['secret'],
-                        thresholdlesskey = self.hasherbackup['thresholdlesskey'],
-                        shamirsecretobj = self.hasherbackup['shamirsecretobj'],
-                        is_unlocked = self.hasherbackup['is_unlocked'])
+    def test_hasher(self):
 
         password1 = make_share('password1')
         password2 = make_share('password2')
         password3 = make_share('password3')
-
+        
         self.assertTrue(password1.startswith('pph$1'))
         self.assertTrue(password2.startswith('pph$2'))
         self.assertTrue(password3.startswith('pph$3'))
@@ -72,14 +76,7 @@ class PolyPasswordHasherTestCase(TestCase):
     # We create a brand new store, lock it and unlock it. We expect to have
     # the secret back at the end of this function.
     def test_unlock_store(self):
-        cache.clear()  
-        if self.hasher.data['secret'] is None:
-            data_backup = self.hasherbackup
-            self.hasher.update(secret=data_backup['secret'],
-                    thresholdlesskey=data_backup['thresholdlesskey'],
-                    is_unlocked=data_backup['is_unlocked'],
-                    shamirsecretobj=data_backup['shamirsecretobj'])
-
+        
         password1 = make_share('password1')
         password2 = make_share('password2')
         password3 = make_share('password3')
@@ -120,7 +117,8 @@ class PolyPasswordHasherTestCase(TestCase):
         # we lock the store forcefully
         self.hasher.update(
             secret=None,
-            thresholdlesskey=None
+            thresholdlesskey=None,
+            is_unlocked=False
         )
 
         # NOTICE: since we are now able to provide hashes even when the context
@@ -145,7 +143,6 @@ class PolyPasswordHasherTestCase(TestCase):
 
     def test_partial_verfication(self):
 
-        cache.clear()
         password1 = make_share('password1')
 
         # Forcefully lock the context
@@ -185,17 +182,7 @@ class PolyPasswordHasherTestCase(TestCase):
     # fail to promote already threshold accounts
     def test_promote_hash(self):
 
-        # Ensure we have an unlocked context to begin with
-        cache.clear()
-        if self.hasher.data['secret'] is None or \
-                not self.hasher.data['is_unlocked']:
-            data_backup = self.hasherbackup
-            self.hasher.update(secret=data_backup['secret'],
-                    thresholdlesskey=data_backup['thresholdlesskey'],
-                    is_unlocked=data_backup['is_unlocked'],
-                    shamirsecretobj=data_backup['shamirsecretobj'])
-
-
+        
         password1 = make('password1')
         promoted_password1 = self.hasher.promote_hash(password1)
 
@@ -243,16 +230,6 @@ class PolyPasswordHasherTestCase(TestCase):
     # This tests for the demote function, which turns a threshold password
     # into a thresholdless password.
     def test_demote_user(self):
-        # Ensure we have an unlocked context to begin with
-        cache.clear()
-        if self.hasher.data['secret'] is None or \
-                not self.hasher.data['is_unlocked']:
-            data_backup = self.hasherbackup
-            self.hasher.update(secret=data_backup['secret'],
-                    thresholdlesskey=data_backup['thresholdlesskey'],
-                    is_unlocked=data_backup['is_unlocked'],
-                    shamirsecretobj=data_backup['shamirsecretobj'])
-
 
         password1 = make_share('password1')
         demoted_password1 = self.hasher.demote_hash(password1)
@@ -305,7 +282,7 @@ class PolyPasswordHasherTestCase(TestCase):
     # To test this, we will create the has both ways: fist from the original 
     # data and one by updatng our resulting hash.
     def test_update_hash_threshold(self): 
-   
+  
         # we will remove the $ because we are going to create the entry
         # artificially
         salt = get_random_string(6).strip('$')
@@ -321,7 +298,7 @@ class PolyPasswordHasherTestCase(TestCase):
         polyhash, sharenumber = self.hasher.update_hash_threshold(
                 pbkdf2_encoded_password)
 
-        password_string = "{}${}${}${}${}".format('pph', sharenumber,
+        password_string = "{0}${1}${2}${3}${4}".format('pph', sharenumber,
                 iterations, salt, polyhash)
 
         # TODO we should cehck whether they can provide partial verification
@@ -355,7 +332,7 @@ class PolyPasswordHasherTestCase(TestCase):
             password_through_update))
 
         # finally, try to log in with our updated password
-        pass_string = "{}${}${}${}${}".format('pph', 0, iterations, salt,
+        pass_string = "{0}${1}${2}${3}${4}".format('pph', 0, iterations, salt,
                 password_through_update)
     
         # TODO we should cehck whether they can provide partial verification
@@ -372,7 +349,6 @@ class PolyPasswordHasherTestCase(TestCase):
 
         # invalid secret[0] will have its first bit inverted.
         # TODO this looks ugly
-#        import pdb; pdb.set_trace()
         if isinstance(valid_secret[0], int):
             byte_to_negate = valid_secret[0]
             byte_to_negate = byte_to_negate ^ 0x1
@@ -386,3 +362,47 @@ class PolyPasswordHasherTestCase(TestCase):
         # now lets verify both
         self.assertTrue(self.hasher.verify_secret(valid_secret))
         self.assertTrue(not self.hasher.verify_secret(invalid_secret))
+
+    # We will attempt to create a threshold number of threshold accounts. After
+    # this, we will attempt recombination with one of the log-ins being a 
+    # partial_verification colission. After this, we will attempt recombination
+    # by logging in threshold + 1 accounts
+    def test_recombination_with_wrong_shares(self):
+
+        # this is a threshold-sensitive test, so we will ensure it's the value
+        # we need
+        self.assertTrue(self.hasher.threshold == 3)
+
+        # create conflicting hash
+        # Consider that these credentials only work for pbkdf2_sha256 and 
+        # 12000 iterations
+        PASSWORD = 'santiago'
+        COLISSION_PASSWORD = 'jojo'
+        SALT = '4IPwS2gg0Oo1'
+        password_with_colission = make_password('santiago', '$4IPwS2gg0Oo1', 
+                hasher='pph')
+
+        # make a threshold number of accounts for unlocking
+        password1 = make_share('password1')
+        password2 = make_share('password2')
+        password3 = make_share('password3')
+
+        # lock the context now.
+        self.hasher.update(
+                secret = None,
+                thresholdlesskey = None,
+                is_unlocked = None)
+
+        # try to recover the secret, use the colission share to make a conflict
+        self.assertTrue(check(COLISSION_PASSWORD, password_with_colission))
+
+        self.assertTrue(check('password1', password1))
+        self.assertTrue(check('password2', password2))
+
+        # should be unlocked, if the first password was correct
+        self.assertTrue(not self.hasher.data['is_unlocked'])
+
+        # should be able to unlock with one more login
+        self.assertTrue(check('password3', password3))
+        self.assertTrue(self.hasher.data['is_unlocked'])
+

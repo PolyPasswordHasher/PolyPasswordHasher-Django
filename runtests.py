@@ -35,6 +35,10 @@ settings.configure(
             'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
             'LOCATION': 'pph_cache',
             'TIMEOUT': None,
+        },
+        'share_cache': {
+            'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+            'LOCATION': 'share_table',
         }
     },
 )

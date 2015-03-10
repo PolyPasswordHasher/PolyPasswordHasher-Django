@@ -46,7 +46,20 @@ class Command(BaseCommand):
 
         print("Creating threshold accounts...")
         for user in users:
-            algorithm, iterations, salt, passhash = user.password.split('$')
+
+            # we try to decompose, if it's a pph locked entry, we treat it
+            # as a pbkdf2 entry
+            try:
+                algorithm, iterations, salt, passhash = user.password.split('$')
+            except:
+                if user.password.startswith("pph$-0$"):
+                    algoritm = 'pbkdf2_sha256'
+                    user_info = user.password.split("$")
+                    iterations = user_info[2]
+                    salt = user_info[3]
+                    passhash = user_info[4]
+                else:
+                    raise
 
             assert algorithm == 'pbkdf2_sha256', \
                 "Cannot update hash for user {0}, hasher ({1}) not supported.".format(

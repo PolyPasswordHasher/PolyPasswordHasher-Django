@@ -6,7 +6,7 @@ from django.core.management import call_command
 
 from django_pph.shamirsecret import ShamirSecret
 from django_pph.settings import SETTINGS
-from django_pph.utils import cache, bin64enc, binary_type
+from django_pph.utils import cache, bin64enc, binary_type, share_cache
 
 
 class Command(BaseCommand):
@@ -21,7 +21,10 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         
         # TODO: require confirmation
-       
+        is_initialized = share_cache.get("is_initialized")
+        if is_initalized:
+            raise Exception("This database has been initialized already!")
+
         call_command("initialize_pph_context", None, None)
 
         threshold = self.hasher.threshold
@@ -91,6 +94,7 @@ class Command(BaseCommand):
             user.save()
 
         print("Database initialized")
+        share_cache.set("is_initialized", True)
 
 
     

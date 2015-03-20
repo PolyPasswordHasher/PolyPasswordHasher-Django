@@ -9,9 +9,8 @@ from django.utils.crypto import get_random_string
 try:
     from Crypto.Cipher import AES
 except ImportError:
-    raise ImproperlyConfigured('You must have PyCrypto installed in order to use the PolyPasswordHasher')
-
-
+    raise ImproperlyConfigured("You must have PyCrypto installed in "
+                               "order to use the PolyPasswordHasher")
 
 from django_pph.shamirsecret import ShamirSecret
 from django_pph.settings import SETTINGS
@@ -23,8 +22,8 @@ from django_pph.utils import cache, bin64enc, binary_type, do_bytearray_xor
 def demote_user(username):
 
     target_user = User.objects.filter(username=username)
-    assert len(target_user) == 1 , \
-            "There is no such user or the database is corrupted"
+    assert len(target_user) == 1,\
+        "There is no such user or the database is corrupted"
 
     hasher = get_hasher('pph')
     hasher.load()
@@ -41,7 +40,6 @@ def demote_user(username):
         if sharenumber > 0:
             number_of_threshold_accounts += 1
 
-
     assert number_of_threshold_accounts > target_threshold
 
     # now, perform the demotion
@@ -52,14 +50,15 @@ def demote_user(username):
         user.password = new_password
         user.save()
 
+
 class Command(BaseCommand):
 
     help = 'Remove a user from the thresholdless-account pool'
 
     def add_arguments(self, parser):
         parser.add_argument('user_id', nargs='+', type=int,
-                help='the target username to add to thresholdless accounts')
-        
+                            help=('the target username to add to '
+                                  'thresholdless accounts'))
 
     def handle(self, *args, **options):
 

@@ -16,7 +16,6 @@ class Command(BaseCommand):
 
         self.lock_store()
 
-
     def lock_store(self):
         """
         Locks a the store for the hasher.

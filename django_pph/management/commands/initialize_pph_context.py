@@ -15,7 +15,6 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
 
-
         # intialize the whole store, basically generate the secret, create
         # a shamir secret object and assign the secret to the thresholdlesskey
         self.hasher.data['secret'] = secret = self.create_secret()
@@ -45,6 +44,5 @@ class Command(BaseCommand):
             secret_digest = self.hasher.digest(secret_digest, '', 1)
         secret_digest = bin64enc(secret_digest)
 
-        
-        secret += binary_type(secret_digest[:SETTINGS['SECRET_VERIFICATION_BYTES']])
+        secret += binary_type(secret_digest[:verification_len])
         return binary_type(secret)

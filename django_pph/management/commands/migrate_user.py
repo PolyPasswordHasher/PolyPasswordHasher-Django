@@ -14,8 +14,8 @@ SUPPORTED_HASHES = set(['pkbdf2_sha256'])
 def migrate_user(username):
 
     target_user = User.objects.filter(username=username)
-    assert len(target_user) == 1, \
-            "there is no such user or the database is corrupted"
+    assert len(target_user) == 1,\
+        "there is no such user or the database is corrupted"
 
     hasher = get_hasher('pph')
     hasher.load()
@@ -29,19 +29,19 @@ def migrate_user(username):
         # TODO: wiould be nice to report somehow
         return
     elif algorithm in SUPPORTED_HASHES:
-        # TODO: with multi-hasher support, we should set the information 
+        # TODO: with multi-hasher support, we should set the information
         # regarding the original hash somewhere
         algorithm, iterations, salt, passhash = encoded.split('$')
-        
+
         if hasher.data['is_unlocked']:
             sharenumber = '0'
             encrypted_entry = hasher.update_hash_thresholdless(passhash)
         else:
-            sharenubmer = '-0' 
+            sharenubmer = '-0'
             encrypted_entry = passhash
-        
+
         password = "{}${}${}${}${}".format('pph', sharenumber, iterations,
-                salt, encrypted_entry)
+                                           salt, encrypted_entry)
 
         user.password = password
         user.save()
@@ -49,7 +49,7 @@ def migrate_user(username):
     else:
 
         raise Exception('impossible to migrate form this type of hash')
-   
+
 
 class Command(BaseCommand):
 
@@ -57,18 +57,8 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('user_id', nargs='+', type=int,
-                help='the target username to add to pph.')
+                            help='the target username to add to pph.')
 
     def handle(self, *args, **options):
 
         migrate_user(args[0])
-                        
-
-                
-
-
-
-
-            
-        
-    

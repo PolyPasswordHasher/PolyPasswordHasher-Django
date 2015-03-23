@@ -6,13 +6,14 @@ from django_pph.shamirsecret import ShamirSecret
 from django_pph.settings import SETTINGS
 from django_pph.utils import cache, bin64enc, binary_type
 
+
 # given a username, search for a user entry in the database and update its hash
 # to make it count towards the threshold for secret recovery
 def promote_user(username):
 
     target_user = User.objects.filter(username=username)
     assert len(target_user) == 1, \
-            "there is no such user or the database is corrupted"
+        "there is no such user or the database is corrupted"
 
     hasher = get_hasher('pph')
     hasher.load()
@@ -22,7 +23,7 @@ def promote_user(username):
         new_password = hasher.promote_hash(encoded)
         user.password = new_password
         user.save()
-   
+
 
 class Command(BaseCommand):
 
@@ -30,18 +31,9 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('user_id', nargs='+', type=int,
-                help='the target username to add to thresholdless accounts')
+                            help=("the target username to add to "
+                                  "thresholdless accounts"))
 
     def handle(self, *args, **options):
 
         promote_user(args[0])
-                        
-
-                
-
-
-
-
-            
-        
-    

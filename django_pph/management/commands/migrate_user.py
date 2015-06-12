@@ -7,7 +7,7 @@ from django_pph.settings import SETTINGS
 
 
 # This will be more elaborate once we have multi-hasher support.
-SUPPORTED_HASHES = set(['pkbdf2_sha256'])
+SUPPORTED_HASHES = set(['pbkdf2_sha256'])
 
 
 # For a given user, turn his passhash into a thresholdless polypasswordhash

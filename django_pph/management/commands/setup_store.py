@@ -19,7 +19,7 @@ class Command(BaseCommand):
     hasher = get_hasher('pph')
 
     def handle(self, *args, **options):
-        
+
         # TODO: require confirmation
         is_initialized = share_cache.get("is_initialized")
         if is_initalized:
@@ -28,7 +28,7 @@ class Command(BaseCommand):
         call_command("initialize_pph_context", None, None)
 
         threshold = self.hasher.threshold
-       
+
         assert len(args) >= threshold, "Not enough users provided to " +\
             "create a store with the current settings.\n\t" +\
             "Usage: ./manage.py setup_store [user1] [user2] ... [usern]"
@@ -37,12 +37,12 @@ class Command(BaseCommand):
         for username in args:
             target_user = User.objects.filter(username=username)
             assert len(target_user) == 1, \
-            "there is no {0} user or the database is corrupted".format(username)
+                ("there is no {0} user or the "
+                 "database is corrupted").format(username)
             users.append(target_user[0])
 
         assert len(users) >= threshold, \
-            "Coudldn't gather enough accounts for store creation" 
-
+            "Coudldn't gather enough accounts for store creation"
 
         print("Creating threshold accounts...")
         for user in users:
@@ -50,7 +50,8 @@ class Command(BaseCommand):
             # we try to decompose, if it's a pph locked entry, we treat it
             # as a pbkdf2 entry
             try:
-                algorithm, iterations, salt, passhash = user.password.split('$')
+                algorithm, iterations, salt, passhash = \
+                        user.password.split('$')
             except:
                 if user.password.startswith("pph$-0$"):
                     algoritm = 'pbkdf2_sha256'
@@ -62,15 +63,15 @@ class Command(BaseCommand):
                     raise
 
             assert algorithm == 'pbkdf2_sha256', \
-                "Cannot update hash for user {0}, hasher ({1}) not supported.".format(
-                            user.username, algorithm)
+                ("Cannot update hash for user {0}, hasher ({1}) "
+                 "not supported.").format(user.username, algorithm)
 
+            new_passhash, sharenumber = \
+                self.hasher.update_hash_threshold(passhash)
 
-            new_passhash, sharenumber = self.hasher.update_hash_threshold(
-                    passhash)
-
-            new_password = "pph${0}${1}${2}${3}".format(sharenumber, iterations,
-                    salt, new_passhash)
+            new_password = \
+                "pph${0}${1}${2}${3}".format(sharenumber, iterations,
+                                             salt, new_passhash)
 
             user.password = new_password
 
@@ -78,8 +79,7 @@ class Command(BaseCommand):
         # actually works
         print("Saving threshold accounts....")
         for user in users:
-            user.save() 
-
+            user.save()
 
         # now update the rest of the existing accounts:
         print("Updating thresholdless accounts...")
@@ -92,22 +92,19 @@ class Command(BaseCommand):
                 continue
 
             if not user.password.startswith('pbkdf2_sha256'):
-                print("Unsupported hashing format for username {0}, skipping.".format(
-                    user.username))
+                print("Unsupported hashing format for username "
+                      "{0}, skipping.".format(user.username))
                 continue
 
             algorithm, iterations, salt, passhash = user.password.split("$")
 
             new_passhash = self.hasher.update_hash_thresholdless(passhash)
 
-            new_password = "pph$0${0}${1}${2}".format(iterations, salt,
-                    new_passhash)
+            new_password = \
+                "pph$0${0}${1}${2}".format(iterations, salt, new_passhash)
 
             user.password = new_password
             user.save()
 
         print("Database initialized")
         share_cache.set("is_initialized", True)
-
-
-    

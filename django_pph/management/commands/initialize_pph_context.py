@@ -5,7 +5,7 @@ from os import urandom
 
 from django_pph.shamirsecret import ShamirSecret
 from django_pph.settings import SETTINGS
-from django_pph.utils import cache, bin64enc, binary_type
+from django_pph.utils import bin64enc, binary_type
 
 
 class Command(BaseCommand):

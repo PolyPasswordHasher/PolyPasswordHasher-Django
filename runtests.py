@@ -4,45 +4,47 @@ import sys
 import django
 from django.conf import settings
 
+urlpatterns = []
+
 
 DIRNAME = os.path.dirname(__file__)
 
-settings.configure(
-    DEBUG=True,
-    DATABASES={
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': 'test.db'
-        }
-    },
-    MIDDLEWARE_CLASSES=(),
-    INSTALLED_APPS=(
-        'django.contrib.auth',
-        'django.contrib.contenttypes',
-        'django.contrib.sessions',
-        'django.contrib.admin',
-        'django_pph',
-    ),
-    ROOT_URLCONF='runtests',
-    PASSWORD_HASHERS=(
-        'django_pph.hashers.PolyPasswordHasher',
-    ),
-    CACHES={
-        'default': {
-            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+if not settings.configured:
+    settings.configure(
+        DEBUG=True,
+        DATABASES={
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': 'test.db'
+            }
         },
-        'pph': {
-            'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
-            'LOCATION': 'pph_cache',
-            'TIMEOUT': None,
+        MIDDLEWARE_CLASSES=(),
+        INSTALLED_APPS=(
+            'django.contrib.auth',
+            'django.contrib.contenttypes',
+            'django.contrib.sessions',
+            'django.contrib.admin',
+            'django_pph',
+        ),
+        ROOT_URLCONF='runtests',
+        PASSWORD_HASHERS=(
+            'django_pph.hashers.PolyPasswordHasher',
+        ),
+        CACHES={
+            'default': {
+                'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            },
+            'pph': {
+                'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
+                'LOCATION': 'pph_cache',
+                'TIMEOUT': None,
+            },
+            'share_cache': {
+                'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+                'LOCATION': 'share_table',
+            }
         },
-        'share_cache': {
-            'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
-            'LOCATION': 'share_table',
-        }
-    },
-)
-
+    )
 
 if hasattr(django, 'setup'):
     django.setup()

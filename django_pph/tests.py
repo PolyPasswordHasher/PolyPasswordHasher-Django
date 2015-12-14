@@ -6,11 +6,10 @@ from base64 import b64encode
 
 from copy import deepcopy
 
-from django_pph.utils import get_cache, constant_time_compare
-from django_pph.management.commands.initialize_pph_context import Command as \
-        pph_init
+from django_pph.utils import cache, constant_time_compare
+from django_pph.management.commands.initialize_pph_context import \
+        Command as pph_init
 
-cache = get_cache('pph')
 
 
 def make(password):
@@ -35,8 +34,8 @@ def reset_hasher_state(hasher, backup):
     
 
 class PolyPasswordHasherTestCase(TestCase):
-    hasher = get_hasher('pph')
 
+    hasher = get_hasher('pph')
     # we'll backup everything to avoid some tests from interfering with
     # another
     hasher.load()
@@ -76,6 +75,8 @@ class PolyPasswordHasherTestCase(TestCase):
     # We create a brand new store, lock it and unlock it. We expect to have
     # the secret back at the end of this function.
     def test_unlock_store(self):
+
+        reset_hasher_state(self.hasher, self.hasherbackup)
         
         password1 = make_share('password1')
         password2 = make_share('password2')

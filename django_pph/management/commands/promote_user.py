@@ -24,16 +24,16 @@ def promote_user(username):
         user.password = new_password
         user.save()
 
-
 class Command(BaseCommand):
 
     help = 'Adds a thresholdless user to the threshold accounts'
 
     def add_arguments(self, parser):
-        parser.add_argument('user_id', nargs='+', type=int,
+        parser.add_argument('user_id', nargs='+',
                             help=("the target username to add to "
                                   "thresholdless accounts"))
 
     def handle(self, *args, **options):
 
-        promote_user(args[0])
+        for username in options['user_id']:
+            promote_user(username)

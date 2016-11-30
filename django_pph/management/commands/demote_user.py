@@ -56,7 +56,7 @@ class Command(BaseCommand):
     help = 'Remove a user from the thresholdless-account pool'
 
     def add_arguments(self, parser):
-        parser.add_argument('user_id', nargs='+', type=int,
+        parser.add_argument('user_id', nargs='+',
                             help=('the target username to add to '
                                   'thresholdless accounts'))
 
@@ -64,4 +64,5 @@ class Command(BaseCommand):
 
         # FIXME: we should support the options arguments or detect different
         # django versions for it.
-        demote_user(args[0])
+        for user in options['user_id']:
+            demote_user(user)

@@ -18,23 +18,27 @@ class Command(BaseCommand):
 
     hasher = get_hasher('pph')
 
+    def add_arguments(self, parser):
+        parser.add_argument("usernames", nargs="+")
+
     def handle(self, *args, **options):
+
         
         # TODO: require confirmation
         is_initialized = share_cache.get("is_initialized")
-        if is_initalized:
+        if is_initialized:
             raise Exception("This database has been initialized already!")
 
-        call_command("initialize_pph_context", None, None)
+        call_command("initialize_pph_context", verbosity=0)
 
         threshold = self.hasher.threshold
        
-        assert len(args) >= threshold, "Not enough users provided to " +\
+        assert len(options['usernames']) >= threshold, "Not enough users provided to " +\
             "create a store with the current settings.\n\t" +\
             "Usage: ./manage.py setup_store [user1] [user2] ... [usern]"
 
         users = []
-        for username in args:
+        for username in options['usernames']:
             target_user = User.objects.filter(username=username)
             assert len(target_user) == 1, \
             "there is no {0} user or the database is corrupted".format(username)
@@ -59,7 +63,8 @@ class Command(BaseCommand):
                     salt = user_info[3]
                     passhash = user_info[4]
                 else:
-                    raise
+                    raise ValueError("This account ({}) already has "
+                        "a shielded/protector value!".format(user.username))
 
             assert algorithm == 'pbkdf2_sha256', \
                 "Cannot update hash for user {0}, hasher ({1}) not supported.".format(

@@ -53,19 +53,15 @@ ROOT_URLCONF = 'example_project.urls'
 
 WSGI_APPLICATION = 'example_project.wsgi.application'
 
-
-# Database
-# https://docs.djangoproject.com/en/1.6/ref/settings/#databases
-
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        'NAME': 'test.db'
     }
 }
 
 PASSWORD_HASHERS = (
-    'django_pph.hashers.PolyPasswordHasherer',
+    'django_pph.hashers.PolyPasswordHasher',
 )
 
 CACHES = {
@@ -73,13 +69,18 @@ CACHES = {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
     },
     'pph': {
-        'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
-        'LOCATION': '127.0.0.1:11211',
+        'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
+        'LOCATION': 'pph_cache',
+        'TIMEOUT': None,
+    },
+    'share_cache': {
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'share_table',
     }
 }
 
 # Internationalization
-# https://docs.djangoproject.com/en/1.6/topics/i18n/
+# https://docs.djangoproject.com/en/1.10/topics/i18n/
 
 LANGUAGE_CODE = 'en-us'
 
